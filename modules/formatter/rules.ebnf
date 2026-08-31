@@ -1,0 +1,33 @@
+/* 这是这个formatter对应的C语言子集的ebnf文件 */
+
+/* 一些基础字符集定义，暂时还是不支持中文作为 begin character算了 */
+token_begin ::= [a-z] | [A-Z] | "$" | "_"
+digit ::= [0-9]
+token_middle ::= token_begin | digit
+hex_digits ::= [a-f] | [A-F] | digit
+sign = "+" | "-" | ""
+
+
+/* 具体到每种语法形式的解析 */
+
+/* hello $hello _hello3 ;  3helllo  */
+identifier ::= token_begin , token_middle*
+
+/* 0 1 10 100 */
+integer_10 = sign, ( (digit-0) , digit* ) | 0
+
+/* 00 01 08 */
+integer_8 ::= 0 , [0-7]+
+/* 0x0 0xf 0xFf */
+integer_16 ::= ("0x" | "0X") , hex_digits+
+/* 0b0 0b1 0b10010 */
+integer_2 ::= ("0b" | "0B") , [0-1]+
+/* 0.1  123324.4324 */
+floating_points_normal ::= sign , digit+ , "." , digit+
+/* 1u 1.34f */
+number ::= 
+( integer_10 , ["u" | "L" | "LL" | "lu" | "llu" | "U" | "LU" | "LLU"] ) |
+integer_8 | integer_16 | integer_2 | ( floating_points_normal , ["f"] )
+
+
+
