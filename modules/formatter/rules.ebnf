@@ -7,9 +7,7 @@ token_middle ::= token_begin | digit
 hex_digits ::= [a-f] | [A-F] | digit
 sign = "+" | "-" | ""
 
-
 /* 具体到每种语法形式的解析 */
-
 /* hello $hello _hello3 ;  3helllo  */
 identifier ::= token_begin , token_middle*
 
@@ -29,5 +27,11 @@ number ::=
 ( integer_10 , ["u" | "L" | "LL" | "lu" | "llu" | "U" | "LU" | "LLU"] ) |
 integer_8 | integer_16 | integer_2 | ( floating_points_normal , ["f"] )
 
+/* 声明 */
+types ::= type keywords
 
+ ::= 
 
+variable_declare ::= types, identifier ["=", ]
+function_declare ::= types, identifier, "(", variable_declare*, ")"
+ 
