@@ -3,6 +3,7 @@
 /* 一些基础字符集定义，暂时还是不支持中文作为 begin character算了 */
 token_begin ::= [a-z] | [A-Z] | "$" | "_"
 digit ::= [0-9]
+oct_digit ::= [0-7]
 token_middle ::= token_begin | digit
 hex_digits ::= [a-f] | [A-F] | digit
 sign = "+" | "-" | ""
@@ -15,23 +16,120 @@ identifier ::= token_begin , token_middle*
 integer_10 = sign, ( (digit-0) , digit* ) | 0
 
 /* 00 01 08 */
-integer_8 ::= 0 , [0-7]+
+integer_8 ::= 0 , oct_digit+
 /* 0x0 0xf 0xFf */
 integer_16 ::= ("0x" | "0X") , hex_digits+
 /* 0b0 0b1 0b10010 */
 integer_2 ::= ("0b" | "0B") , [0-1]+
 /* 0.1  123324.4324 */
 floating_points_normal ::= sign , digit+ , "." , digit+
-/* 1u 1.34f */
-number ::= 
-( integer_10 , ["u" | "L" | "LL" | "lu" | "llu" | "U" | "LU" | "LLU"] ) |
-integer_8 | integer_16 | integer_2 | ( floating_points_normal , ["f"] )
 
-/* 声明 */
-types ::= type keywords
+/* 后缀定义：区分 int、long 以及 float */
+int_suffix ::= "u" | "U"
+long_suffix ::= "l" | "L" | "lu" | "LU" | "ll" | "LL" | "llu" | "LLU"
+float_suffix ::= "f" | "F"
 
- ::= 
+/* 常量识别规则 (区分 int / long / float / char) */
+int_const ::= ( integer_10 | integer_8 | integer_16 | integer_2 ) , [ int_suffix ]
+long_const ::= ( integer_10 | integer_8 | integer_16 | integer_2 ) , long_suffix
+float_const ::= floating_points_normal , [ float_suffix ]
+char_const ::= "'" , ( [^'\\\n] | "\\" , . ) , "'"
 
-variable_declare ::= types, identifier ["=", ]
-function_declare ::= types, identifier, "(", variable_declare*, ")"
- 
+number ::= long_const | int_const | float_const
+
+/* 注释与预处理指令（用于格式化保留与AST构建） */
+line_comment ::= "//" , [^\n]*
+block_comment ::= "/*" , .* , "*/"
+preprocess_include ::= "#include" , ( ("<" , [^>]+ , ">") | ("\"" , [^\"]+ , "\"") )
+preprocess_define ::= "#define" , identifier , [ [^\n]+ ]
+preprocess ::= preprocess_include | preprocess_define
+
+/* ---------------- 语法规则与声明定义 ---------------- */
+
+/* 类型关键字 */
+types ::= "int" | "float" | "char" | "long" | "void"
+
+/* 数组维度说明：支持 a[10] 或多维 a[10][20] */
+array_dimension ::= "[" , [ integer_10 | integer_16 | integer_8 ] , "]"
+array_declarator ::= identifier , array_dimension+
+
+/* 变量声明单元与初值赋予 */
+variable_declarator ::= ( array_declarator | identifier ) , [ "=" , ( expression | array_initializer ) ]
+array_initializer ::= "{" , [ expression , ( "," , expression )* ] , "}"
+
+/* 变量声明语句：int a, b=10, arr[5]; */
+variable_declare ::= types , variable_declarator , ( "," , variable_declarator )* , ";"
+
+/* 形参与参数列表 */
+parameter_declare ::= types , ( identifier , [ "[" , "]" , array_dimension* ] )
+parameter_list ::= parameter_declare , ( "," , parameter_declare )*
+
+/* 函数声明与函数定义：带分号为声明，带复合语句为定义 */
+function_declare ::= types , identifier , "(" , [ parameter_list ] , ")" , ";"
+function_define ::= types , identifier , "(" , [ parameter_list ] , ")" , compound_statement
+
+/* ---------------- 语句体系 ---------------- */
+
+statement ::= expression_statement
+            | compound_statement
+            | if_statement
+            | while_statement
+            | for_statement
+            | return_statement
+            | break_statement
+            | continue_statement
+            | preprocess
+            | line_comment
+            | block_comment
+
+/* 复合语句块 { ... } */
+compound_statement ::= "{" , ( variable_declare | statement )* , "}"
+
+/* 表达式语句 */
+expression_statement ::= [ expression ] , ";"
+
+/* 分支语句：if 及 if-else */
+if_statement ::= "if" , "(" , expression , ")" , statement , [ "else" , statement ]
+
+/* 循环语句：while 与 for */
+while_statement ::= "while" , "(" , expression , ")" , statement
+for_statement ::= "for" , "(" , ( variable_declare | expression_statement ) , [ expression ] , ";" , [ expression ] , ")" , statement
+
+/* 跳转语句 */
+return_statement ::= "return" , [ expression ] , ";"
+break_statement ::= "break" , ";"
+continue_statement ::= "continue" , ";"
+
+/* 表达式与运算符（按优先级分层） */
+
+expression ::= assignment_expression
+
+assignment_expression ::= ( identifier , [ array_access ] , "=" , assignment_expression ) | logical_or_expression
+
+logical_or_expression ::= logical_and_expression , ( "||" , logical_and_expression )*
+
+logical_and_expression ::= equality_expression , ( "&&" , equality_expression )*
+
+equality_expression ::= relational_expression , ( ( "==" | "!=" ) , relational_expression )*
+
+relational_expression ::= additive_expression , ( ( "<" | "<=" | ">" | ">=" ) , additive_expression )*
+
+additive_expression ::= multiplicative_expression , ( ( "+" | "-" ) , multiplicative_expression )*
+
+multiplicative_expression ::= primary_expression , ( ( "*" | "/" | "%" ) , primary_expression )*
+
+/* 初等表达式：变量、数组下标访问、函数调用、常量、括号表达式 */
+primary_expression ::= function_call
+                     | array_access
+                     | identifier
+                     | number
+                     | char_const
+                     | "(" , expression , ")"
+
+array_access ::= identifier , ( "[" , expression , "]" )+
+function_call ::= identifier , "(" , [ argument_list ] , ")"
+argument_list ::= expression , ( "," , expression )*
+
+/* 程序入口 */
+/* 整个源文件由全局变量、函数声明、函数定义及预处理指令构成 */
+program ::= ( preprocess | variable_declare | function_declare | function_define | line_comment | block_comment )*
