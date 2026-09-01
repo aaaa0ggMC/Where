@@ -28,5 +28,6 @@ int sv_length(string_view sv);
 string_view sv_substr(string_view sv,int begin, int length);
 /// 相等返回1, 不相等返回0
 int sv_equals(string_view a, string_view b);
+void sv_puts(string_view sv);
 
 #endif

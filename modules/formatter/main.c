@@ -3,10 +3,13 @@
 #include <string.h>
 // 帮助内容
 #include <formatter/help_message.h>
+#include <formatter/tokenizer.h>
 
-
+/// 预留的token解析大小
+#define RESERVE_TOKENS 1024
 #define ERROR_CLEANUP {puts(help_message);exit(-1);}
 #define LOG(...) printf(__VA_ARGS__)
+#define LOG_SV(SV) sv_puts(SV);
 
 
 int main(int argc, const char * argv[]){
@@ -51,6 +54,7 @@ int main(int argc, const char * argv[]){
     // !IMPORTANT sv我的选择是指向指针的指针，因此这里必须保证生命周期足够长
     // 虽然这里代码显然可以看出来生命周期很长
     char * file_buffer = NULL;
+    string_view input_sv;
 
     if(!input_file){
         fprintf(stderr, "Fatal Error: unable to open file \"%s\"! \n", input_file_path);
@@ -66,13 +70,29 @@ int main(int argc, const char * argv[]){
         fread(file_buffer,sizeof(char),buffer_size,input_file);
         // 确保是一个合法的字符串
         file_buffer[buffer_size] = '\0';
+        // 不算后面的0
+        input_sv = sv_build(&file_buffer, 0 , buffer_size);
     
         LOG("Read input:\n```c\n%s\n```\n", file_buffer);
     }
     fclose(input_file);
-    // 后面基本不会出现致命错误了，因此这里不需要goto，保证都能正常释放就行
+    // 后面基本不会定义变量了，而且workflow很清晰，因此为了进行资源清理，使用goto
+    
+    vector tokens = vec_new(sizeof(Token), RESERVE_TOKENS);
 
     // 词法分析
+    if(parse_tokens(input_sv, &tokens)) goto parse_tokens_failed;
+    
+    for(
+        void * data = vec_begin(&tokens); 
+        data != vec_end(&tokens); 
+        data = vec_next(&tokens,data)
+    ){
+        Token * token = (Token *)data;
+        LOG("Got token \"");
+        LOG_SV(token->data);
+        LOG("\" \n");
+    }
 
     // 语法分析
 
@@ -80,6 +100,10 @@ int main(int argc, const char * argv[]){
 
     // 如果有格式化需求进行格式化
 
+parse_ast_failed:
+
+parse_tokens_failed:
+    vec_delete(&tokens);
     free(file_buffer);
     file_buffer = NULL;
     return 0;

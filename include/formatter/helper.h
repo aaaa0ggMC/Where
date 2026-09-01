@@ -11,11 +11,11 @@
 #ifndef HELPER_H_INCLUDED
 #define HELPER_H_INCLUDED
 
-inline int imax(int a,int b){
+static inline int imax(int a,int b){
     return (a > b) ? a : b;
 }
 
-inline int imin(int a,int b){
+static inline int imin(int a,int b){
     return (a < b) ? a : b;
 }
 
