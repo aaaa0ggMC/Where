@@ -18,7 +18,7 @@ char context_peek(parsing_context * context);
 char context_fetch(parsing_context * context);
 token_result parse_ident(parsing_context * context);
 
-int parse_tokens(string_view sv, vector * vec){
+tokenizer_result parse_tokens(string_view sv, vector * vec){
     tokenizer_result result = {
         .success = 1
     };
@@ -48,8 +48,8 @@ int parse_tokens(string_view sv, vector * vec){
     return result;
 }
 
-void delete_token_result(tokenizer_result * result){
-    if(result.message) free(result->message);
+void delete_tokenizer_result(tokenizer_result * result){
+    if(result->message) free(result->message);
 }
 
 char context_peek(parsing_context * context){

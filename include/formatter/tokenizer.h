@@ -39,7 +39,7 @@ typedef struct {
 } tokenizer_result;
 
 
-void delete_token_result(tokenizer_result * result);
+void delete_tokenizer_result(tokenizer_result * result);
 tokenizer_result parse_tokens(string_view sv, vector * vec);
 
 // 返回未知token

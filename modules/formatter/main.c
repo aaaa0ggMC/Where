@@ -82,7 +82,9 @@ int main(int argc, const char * argv[]){
     vector tokens = vec_new(sizeof(Token), RESERVE_TOKENS);
 
     // 词法分析
-    if(parse_tokens(input_sv, &tokens)) goto parse_tokens_failed;
+    tokenizer_result t_result = parse_tokens(input_sv, &tokens);
+    if(!t_result.success) goto parse_tokens_failed;
+    delete_tokenizer_result(&t_result);
     
     for(
         void * data = vec_begin(&tokens); 
