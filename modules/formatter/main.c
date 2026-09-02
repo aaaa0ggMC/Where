@@ -65,13 +65,14 @@ int main(int argc, const char * argv[]){
 
         long buffer_size = ftell(input_file);
         file_buffer = (char *)malloc(sizeof(char) * (buffer_size + 1));
+        // 确保是一个合法的字符串
+        memset(file_buffer,sizeof(char),(buffer_size+1));
+
         fseek(input_file,0,SEEK_SET);
         
         fread(file_buffer,sizeof(char),buffer_size,input_file);
-        // 确保是一个合法的字符串
-        file_buffer[buffer_size] = '\0';
         // 不算后面的0
-        input_sv = sv_build(&file_buffer, 0 , buffer_size);
+        input_sv = sv_build(file_buffer, 0 , buffer_size);
     
         LOG("Read input:\n```c\n%s\n```\n", file_buffer);
     }

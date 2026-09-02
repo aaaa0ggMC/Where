@@ -5,18 +5,18 @@
 #include <stdio.h>
 
 char * sv_begin(string_view sv){
-    return (*sv.buffer + sv.begin);
+    return (sv.buffer + sv.begin);
 }
 
 char * sv_end(string_view sv){
-    (*sv.buffer + sv.begin + sv.length);
+    return (sv.buffer + sv.begin + sv.length);
 }
 
 int sv_length(string_view sv){
     return sv.length;
 }
 
-string_view sv_build(char ** str, int subbegin , int length){
+string_view sv_build(char * str, int subbegin , int length){
     string_view ret = {
         .buffer = str,
         .begin = subbegin,
@@ -47,4 +47,8 @@ void sv_puts(string_view sv){
     ){
         putchar(*data);
     }
+}
+
+char sv_at(string_view sv, int pos){
+    return sv_begin(sv)[pos];
 }

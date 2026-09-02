@@ -22,7 +22,7 @@ void* vec_push_back(vector * vec){
     }
 
     // 返回 vec->data + vec->size ， 之后size加1
-    return vec->data + ((vec->size)++);
+    return (char*)vec->data + ((vec->size)++) * vec->sizeof_data;
 }
 
 void vec_delete(vector * vec){
@@ -36,7 +36,7 @@ void* vec_begin(vector * vec){
 }
 
 void* vec_end(vector * vec){
-    return vec->data + vec->size;
+    return (char*)vec->data + vec->size * vec->sizeof_data;
 }
 
 void * vec_next(vector * vec,void* data){
