@@ -19,6 +19,10 @@ char context_fetch(parsing_context * context);
 token_result parse_ident(parsing_context * context);
 
 int parse_tokens(string_view sv, vector * vec){
+    tokenizer_result result = {
+        .success = 1
+    };
+    
     parsing_context context = {
         .sv = sv,
         .vec = vec,
@@ -29,7 +33,6 @@ int parse_tokens(string_view sv, vector * vec){
         }
     };
 
-    Token current_token;
     while(context.index < sv_length(sv)){
         // printf("parsing... %d/%d\n",context.index,sv_length(sv));
         // 跳过空格
@@ -38,12 +41,15 @@ int parse_tokens(string_view sv, vector * vec){
             context_fetch(&context);
             continue;
         }else if(ch_token_begin(peek)){
-            current_token = parse_ident(&context).token;
-            *((Token*)vec_push_back(vec)) = current_token;
+            *((Token*)vec_push_back(vec)) = parse_ident(&context).token;
         }else context_fetch(&context); // 暂时不报错
     }
 
-    return 0;
+    return result;
+}
+
+void delete_token_result(tokenizer_result * result){
+    if(result.message) free(result->message);
 }
 
 char context_peek(parsing_context * context){

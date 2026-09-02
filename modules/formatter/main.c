@@ -66,7 +66,7 @@ int main(int argc, const char * argv[]){
         long buffer_size = ftell(input_file);
         file_buffer = (char *)malloc(sizeof(char) * (buffer_size + 1));
         // 确保是一个合法的字符串
-        memset(file_buffer,sizeof(char),(buffer_size+1));
+        memset(file_buffer,0,sizeof(char) * (buffer_size+1));
 
         fseek(input_file,0,SEEK_SET);
         

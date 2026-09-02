@@ -33,7 +33,14 @@ typedef struct {
     TokenLocation location;
 } Token;
 
-int parse_tokens(string_view sv, vector * vec);
+typedef struct {
+    int success;
+    char * message;
+} tokenizer_result;
+
+
+void delete_token_result(tokenizer_result * result);
+tokenizer_result parse_tokens(string_view sv, vector * vec);
 
 // 返回未知token
 static inline Token token_null(string_view sv){
@@ -91,7 +98,7 @@ static inline int ch_space(char ch){
 }
 
 // 是否为预处理
-static inline int ch_begin_prepocessor(char ch){
+static inline int ch_begin_preprocessor(char ch){
     return ch == '#';
 }
 
