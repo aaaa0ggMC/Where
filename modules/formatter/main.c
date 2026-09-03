@@ -83,8 +83,16 @@ int main(int argc, const char * argv[]){
 
     // 词法分析
     tokenizer_result t_result = parse_tokens(input_sv, &tokens);
+    for(
+        void * data = vec_begin(&(t_result.diagnoses)); 
+        data != vec_end(&(t_result.diagnoses)); 
+        data = vec_next(&(t_result.diagnoses),data)
+    ){
+        stage_diagnosis * ana = data;
+        LOG("%s \n",ana->message);
+    }
+    sd_delete(&(t_result.diagnoses));
     if(!t_result.success) goto parse_tokens_failed;
-    delete_tokenizer_result(&t_result);
     
     for(
         void * data = vec_begin(&tokens); 
@@ -92,9 +100,9 @@ int main(int argc, const char * argv[]){
         data = vec_next(&tokens,data)
     ){
         Token * token = (Token *)data;
-        LOG("Got token \"");
+        LOG("Got token type=%s data=\"", token_string(token->type));
         LOG_SV(token->data);
-        LOG("\" \n");
+        LOG("\" location=(%d,%d) \n", token->location.row, token->location.col);
     }
 
     // 语法分析

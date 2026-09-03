@@ -12,19 +12,30 @@
 #define TOKENIZER_H_INCLUDED
 #include <formatter/string_view.h>
 #include <formatter/vector.h>
+#include <formatter/diagnoses.h>
 #include <stdlib.h>
 #include <string.h>
 
-enum TokenType {
-    T_UNKNOWN,
-    T_IDENTIFIER
-};
+#define TOKEN_LIST(X) \
+    X(T_UNKNOWN), /* 未知符号，占位 */ \
+    X(T_IDENTIFIER), /* 标识符 */ \
+    X(T_END_STATEMENT), /* 句子结尾，比如分毫 */ \
+    X(T_RECOVERY) /* 处于恢复模式的符号，占位 */
 
-/// 每个Token所处的行号列号
-typedef struct {
-    int row;
-    int col;
-} TokenLocation;
+#define XTOKEN(X) X
+enum TokenType {
+    TOKEN_LIST(XTOKEN)
+};
+#undef XTOKEN
+
+#define XTOKEN(X) #X
+static const char* token_strings[] = {
+    TOKEN_LIST(XTOKEN)
+};
+#undef XTOKEN
+
+const char * token_string(enum TokenType type);
+#undef TOKEN_LIST
 
 typedef struct {
     enum TokenType type;
@@ -35,11 +46,10 @@ typedef struct {
 
 typedef struct {
     int success;
-    char * message;
+    // 报错信息
+    stage_diagnoses diagnoses;
 } tokenizer_result;
 
-
-void delete_tokenizer_result(tokenizer_result * result);
 tokenizer_result parse_tokens(string_view sv, vector * vec);
 
 // 返回未知token
@@ -92,6 +102,11 @@ static inline int ch_line_break(char ch){
     return (ch == '\n');
 }
 
+// 是否结束了
+static inline int ch_eof(char ch){
+    return ch == '\0';
+}
+
 // 是否为空白字符
 static inline int ch_space(char ch){
     return ch_in_pattern(ch," \t",2) || ch_line_break(ch);
@@ -102,5 +117,9 @@ static inline int ch_begin_preprocessor(char ch){
     return ch == '#';
 }
 
+// 是否为语句结束
+static inline int ch_statement_end(char ch){
+    return ch == ';';
+}
 
 #endif
