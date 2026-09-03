@@ -92,8 +92,7 @@ int main(int argc, const char * argv[]){
         LOG("%s \n",ana->message);
     }
     sd_delete(&(t_result.diagnoses));
-    if(!t_result.success) goto parse_tokens_failed;
-    
+
     for(
         void * data = vec_begin(&tokens); 
         data != vec_end(&tokens); 
@@ -104,6 +103,8 @@ int main(int argc, const char * argv[]){
         LOG_SV(token->data);
         LOG("\" location=(%d,%d) \n", token->location.row, token->location.col);
     }
+
+    if(!t_result.success) goto parse_tokens_failed;
 
     // 语法分析
 
