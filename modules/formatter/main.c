@@ -9,7 +9,61 @@
 #define RESERVE_TOKENS 1024
 #define ERROR_CLEANUP {puts(help_message);exit(-1);}
 #define LOG(...) printf(__VA_ARGS__)
-#define LOG_SV(SV) sv_puts(SV);
+
+
+static int is_number_token(enum TokenType type){
+    return type == T_NUMBER ||
+        type == T_NUMBER_HEX ||
+        type == T_NUMBER_OCT ||
+        type == T_NUMBER_BIN ||
+        type == T_NUMBER_FLOAT;
+}
+
+static const char * ival_type_string(enum TokenIValType itype){
+    switch(itype){
+        case I_VOID: return "I_VOID";
+        case I_INT: return "I_INT";
+        case I_LONG: return "I_LONG";
+        case I_UINT: return "I_UINT";
+        case I_ULONG: return "I_ULONG";
+        case I_LONG_LONG: return "I_LONG_LONG";
+        case I_ULONG_LONG: return "I_ULONG_LONG";
+        case I_DOUBLE: return "I_DOUBLE";
+        case I_FLOAT: return "I_FLOAT";
+        case I_LONG_DOUBLE: return "I_LONG_DOUBLE";
+    }
+    return "?";
+}
+
+/// 打印时对不可见字符做转义，避免多行 token（如注释）把调试输出弄乱
+static void log_token_data(string_view sv){
+    for(char * ptr = sv_begin(sv); ptr != sv_end(sv); ++ptr){
+        switch(*ptr){
+            case '\n': fputs("\\n", stdout); break;
+            case '\t': fputs("\\t", stdout); break;
+            case '\r': fputs("\\r", stdout); break;
+            default: putchar(*ptr);
+        }
+    }
+}
+
+static void log_token(Token * token){
+    LOG("type=%-22s data=\"", token_string(token->type));
+    log_token_data(token->data);
+    LOG("\"");
+    if(is_number_token(token->type)){
+        LOG(" itype=%-14s ival=", ival_type_string(token->itype));
+        switch(token->itype){
+            case I_UINT: case I_ULONG: case I_ULONG_LONG:
+            case I_INT: case I_LONG: case I_LONG_LONG:
+                LOG("%llu", token->ival.ull); break;
+            case I_FLOAT: case I_DOUBLE: case I_LONG_DOUBLE:
+                LOG("%Lg", token->ival.ld); break;
+            default: LOG("?"); break;
+        }
+    }
+    LOG(" loc=(%d,%d)\n", token->location.row, token->location.col);
+}
 
 
 int main(int argc, const char * argv[]){
@@ -98,10 +152,7 @@ int main(int argc, const char * argv[]){
         data != vec_end(&tokens); 
         data = vec_next(&tokens,data)
     ){
-        Token * token = (Token *)data;
-        LOG("Got token type=%s data=\"", token_string(token->type));
-        LOG_SV(token->data);
-        LOG("\" location=(%d,%d) \n", token->location.row, token->location.col);
+        log_token((Token *)data);
     }
 
     if(!t_result.success) goto parse_tokens_failed;

@@ -1,5 +1,6 @@
 # C Files
-.o
+*.o
+*.out
 
 # Build
 build

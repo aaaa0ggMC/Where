@@ -30,5 +30,8 @@ string_view sv_substr(string_view sv,int begin, int length);
 int sv_equals(string_view a, string_view b);
 void sv_puts(string_view sv);
 char sv_at(string_view sv,int pos);
+int sv_contains(string_view sv,char ch);
+/// 这个返回值返回第一个ch在的位置，没有返回-1
+int sv_find_first_of(string_view sv,char ch);
 
 #endif

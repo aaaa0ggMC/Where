@@ -52,3 +52,18 @@ void sv_puts(string_view sv){
 char sv_at(string_view sv, int pos){
     return sv_begin(sv)[pos];
 }
+
+int sv_contains(string_view sv,char c){
+    for(char * ptr = sv_begin(sv); ptr != sv_end(sv); ++ptr){
+        if(*ptr == c)return 1;
+    }
+    return 0;
+}
+
+
+int sv_find_first_of(string_view sv,char ch){
+    for(char * ptr = sv_begin(sv); ptr != sv_end(sv); ++ptr){
+        if(*ptr == ch)return (ptr - sv_begin(sv));
+    }
+    return -1;
+}

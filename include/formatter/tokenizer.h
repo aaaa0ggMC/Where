@@ -20,11 +20,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum TokenIValType{
+    I_VOID,
+    I_INT,
+    I_LONG,
+    I_UINT,
+    I_ULONG,
+    I_LONG_LONG,
+    I_ULONG_LONG,
+    I_DOUBLE,
+    I_FLOAT,
+    I_LONG_DOUBLE
+};
+
+
 typedef struct {
     enum TokenType type;
     // 这里的话即使是比如T_WHILE这种简单的也可以进行存储，因为反正不多占空间
     string_view data;
     TokenLocation location;
+
+    // 这里是解析出来的内建常量，用什么类型存储由 itype 决定
+    enum TokenIValType itype;
+    union {
+        unsigned long long ull;
+        long long ll;
+        long double ld;
+    } ival;
 } Token;
 
 typedef struct {
@@ -43,6 +65,10 @@ static inline Token token_null(string_view sv){
         .location = {
             .row = -1,
             .col = -1
+        },
+        .itype = I_VOID,
+        .ival = {
+            .ld = 0
         }
     };
     return t;
