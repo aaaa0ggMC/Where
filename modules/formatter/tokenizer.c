@@ -224,6 +224,136 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
             GEN_TOKEN(token, T_OP_BIT_NOT, 1);
             ADD_TOKEN(vec, token);
             context_fetch(context);
+        }else if(peek == ','){
+            GEN_TOKEN(token, T_COMMA, 1);
+            ADD_TOKEN(vec, token);
+            context_fetch(context);
+        }else if(peek == ':'){
+            GEN_TOKEN(token, T_OP_COLON, 1);
+            ADD_TOKEN(vec, token);
+            context_fetch(context);
+        }else if(peek == '"'){
+            int s_start = context->index;
+            context_fetch(context);
+            while(!ch_eof(context_peek(context))){
+                char c = context_peek(context);
+                if(c == '"'){
+                    context_fetch(context);
+                    break;
+                }
+                if(c == '\\'){
+                    context_fetch(context);
+                    if(!ch_eof(context_peek(context))){
+                        context_fetch(context);
+                    }
+                }else if(ch_line_break(c)){
+                    break;
+                }else{
+                    context_fetch(context);
+                }
+            }
+            Token token = {
+                .type = T_STRING_LITERAL,
+                .data = sv_substr(context->sv, s_start, context->index - s_start),
+                .location = context->location,
+                .itype = I_VOID,
+                .ival = { .ld = 0 },
+                .next = NULL
+            };
+            ADD_TOKEN(vec, token);
+        }else if(peek == '\''){
+            int c_start = context->index;
+            context_fetch(context);
+            while(!ch_eof(context_peek(context))){
+                char c = context_peek(context);
+                if(c == '\''){
+                    context_fetch(context);
+                    break;
+                }
+                if(c == '\\'){
+                    context_fetch(context);
+                    if(!ch_eof(context_peek(context))){
+                        context_fetch(context);
+                    }
+                }else if(ch_line_break(c)){
+                    break;
+                }else{
+                    context_fetch(context);
+                }
+            }
+            Token token = {
+                .type = T_CHAR_LITERAL,
+                .data = sv_substr(context->sv, c_start, context->index - c_start),
+                .location = context->location,
+                .itype = I_VOID,
+                .ival = { .ld = 0 },
+                .next = NULL
+            };
+            ADD_TOKEN(vec, token);
+        }else if(ch_begin_preprocessor(peek)){
+            int pp_start = context->index;
+            context_fetch(context);
+            while(ch_space(context_peek(context)) && !ch_line_break(context_peek(context))){
+                context_fetch(context);
+            }
+            int ident_start = context->index;
+            while(ch_token_middle(context_peek(context))){
+                context_fetch(context);
+            }
+            string_view pp_name = sv_substr(context->sv, ident_start, context->index - ident_start);
+            enum TokenType pp_type = T_UNKNOWN;
+            if(sv_equals(pp_name, sv_build("include", 0, 7))){
+                pp_type = T_PP_INCLUDE;
+            }else if(sv_equals(pp_name, sv_build("define", 0, 6))){
+                pp_type = T_PP_DEFINE;
+            }else if(sv_equals(pp_name, sv_build("undef", 0, 5))){
+                pp_type = T_PP_UNDEF;
+            }else if(sv_equals(pp_name, sv_build("if", 0, 2))){
+                pp_type = T_PP_IF;
+            }else if(sv_equals(pp_name, sv_build("ifdef", 0, 5))){
+                pp_type = T_PP_IFDEF;
+            }else if(sv_equals(pp_name, sv_build("ifndef", 0, 6))){
+                pp_type = T_PP_IFNDEF;
+            }else if(sv_equals(pp_name, sv_build("else", 0, 4))){
+                pp_type = T_PP_ELSE;
+            }else if(sv_equals(pp_name, sv_build("elif", 0, 4))){
+                pp_type = T_PP_ELIF;
+            }else if(sv_equals(pp_name, sv_build("endif", 0, 5))){
+                pp_type = T_PP_ENDIF;
+            }
+
+            Token pp_token = {
+                .type = (pp_type != T_UNKNOWN) ? pp_type : T_IDENTIFIER,
+                .data = sv_substr(context->sv, pp_start, context->index - pp_start),
+                .location = context->location,
+                .itype = I_VOID,
+                .ival = { .ld = 0 },
+                .next = NULL
+            };
+            ADD_TOKEN(vec, pp_token);
+
+            if(pp_type == T_PP_INCLUDE){
+                while(ch_space(context_peek(context)) && !ch_line_break(context_peek(context))){
+                    context_fetch(context);
+                }
+                if(context_peek(context) == '<'){
+                    int h_start = context->index;
+                    context_fetch(context);
+                    while(!ch_line_break(context_peek(context)) && !ch_eof(context_peek(context))){
+                        char c = context_fetch(context);
+                        if(c == '>') break;
+                    }
+                    Token h_token = {
+                        .type = T_HEADER_NAME,
+                        .data = sv_substr(context->sv, h_start, context->index - h_start),
+                        .location = context->location,
+                        .itype = I_VOID,
+                        .ival = { .ld = 0 },
+                        .next = NULL
+                    };
+                    ADD_TOKEN(vec, h_token);
+                }
+            }
         }
         /// 报错的恢复措施
         else{
@@ -250,6 +380,19 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
         }
     }
 
+    // 串联所有 token 为单链表，便于 parser 前瞻与遍历
+    Token * prev_tok = NULL;
+    for(
+        void * data = vec_begin(vec); 
+        data != vec_end(vec); 
+        data = vec_next(vec, data)
+    ){
+        Token * cur = (Token*)data;
+        cur->next = NULL;
+        if(prev_tok) prev_tok->next = cur;
+        prev_tok = cur;
+    }
+
     return result;
 }
 
@@ -267,6 +410,8 @@ void build_keywords(){
     hashmap_set(keywords, hashmap_str_lit("default"), T_KW_DEFAULT);
     hashmap_set(keywords, hashmap_str_lit("goto"), T_KW_GOTO);
     hashmap_set(keywords, hashmap_str_lit("for"), T_KW_FOR);
+    hashmap_set(keywords, hashmap_str_lit("break"), T_KW_BREAK);
+    hashmap_set(keywords, hashmap_str_lit("continue"), T_KW_CONTINUE);
 }
 
 TokenType try_resolve_keyword(hashmap * kw_map, string_view sv){

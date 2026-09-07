@@ -34,7 +34,9 @@ enum TokenIValType{
 };
 
 
-typedef struct {
+typedef struct Token Token;
+
+struct Token {
     enum TokenType type;
     // 这里的话即使是比如T_WHILE这种简单的也可以进行存储，因为反正不多占空间
     string_view data;
@@ -47,7 +49,9 @@ typedef struct {
         long long ll;
         long double ld;
     } ival;
-} Token;
+
+    Token * next;
+};
 
 typedef struct {
     int success;
@@ -57,7 +61,6 @@ typedef struct {
 
 tokenizer_result parse_tokens(string_view sv, vector * vec);
 void terminate_tokenizer();
-
 
 // 返回未知token
 static inline Token token_null(string_view sv){
@@ -71,7 +74,8 @@ static inline Token token_null(string_view sv){
         .itype = I_VOID,
         .ival = {
             .ld = 0
-        }
+        },
+        .next = NULL
     };
     return t;
 }

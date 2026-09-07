@@ -61,7 +61,22 @@
     X(T_KW_DEFAULT), /*default*/ \
     X(T_KW_GOTO), /*goto*/ \
     X(T_KW_FOR), /*for*/ \
+    X(T_KW_BREAK), /*break*/ \
+    X(T_KW_CONTINUE), /*continue*/ \
     X(T_OP_COLON), /*: 用于switch还有tag*/ \
+    X(T_COMMA), /* , 逗号 */ \
+    X(T_STRING_LITERAL), /* 字符串常量 */ \
+    X(T_CHAR_LITERAL), /* 字符常量 */ \
+    X(T_PP_INCLUDE), /* #include */ \
+    X(T_PP_DEFINE), /* #define */ \
+    X(T_PP_UNDEF), /* #undef */ \
+    X(T_PP_IF), /* #if */ \
+    X(T_PP_IFDEF), /* #ifdef */ \
+    X(T_PP_IFNDEF), /* #ifndef */ \
+    X(T_PP_ELSE), /* #else */ \
+    X(T_PP_ELIF), /* #elif */ \
+    X(T_PP_ENDIF), /* #endif */ \
+    X(T_HEADER_NAME), /* <stdio.h> 形式的头文件路径 */ \
     X(T_UNKNOWN) /* 未知符号，占位 */ 
 
 #define XTOKEN(X) X

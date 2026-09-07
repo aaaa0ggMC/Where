@@ -4,6 +4,8 @@
 // 帮助内容
 #include <formatter/help_message.h>
 #include <formatter/tokenizer.h>
+#include <formatter/ast.h>
+#include <formatter/parser.h>
 
 /// 预留的token解析大小
 #define RESERVE_TOKENS 1024
@@ -158,10 +160,35 @@ int main(int argc, const char * argv[]){
     if(!t_result.success) goto parse_tokens_failed;
 
     // 语法分析
+    stage_diagnoses parser_diagnoses = vec_new(sizeof(stage_diagnosis), 8);
+    Token * first_tok = (Token *)vec_begin(&tokens);
+    Node * ast_root = parse_ast(first_tok, &parser_diagnoses);
+
+    for(
+        void * data = vec_begin(&parser_diagnoses); 
+        data != vec_end(&parser_diagnoses); 
+        data = vec_next(&parser_diagnoses, data)
+    ){
+        stage_diagnosis * ana = data;
+        LOG("%s \n", ana->message);
+    }
+
+    if(parser_diagnoses.size > 0){
+        sd_delete(&parser_diagnoses);
+        if(ast_root) ast_free(ast_root);
+        goto parse_ast_failed;
+    }
+    sd_delete(&parser_diagnoses);
 
     // 输出AST结构
+    if(ast_root){
+        LOG("\nAST Hierarchy:\n");
+        print_ast(ast_root, 0);
+    }
 
     // 如果有格式化需求进行格式化
+
+    if(ast_root) ast_free(ast_root);
 
 parse_ast_failed:
 
