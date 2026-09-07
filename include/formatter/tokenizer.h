@@ -49,8 +49,6 @@ struct Token {
         long long ll;
         long double ld;
     } ival;
-
-    Token * next;
 };
 
 typedef struct {
@@ -73,9 +71,8 @@ static inline Token token_null(string_view sv){
         },
         .itype = I_VOID,
         .ival = {
-            .ld = 0
-        },
-        .next = NULL
+            .ll = 0
+        }
     };
     return t;
 }

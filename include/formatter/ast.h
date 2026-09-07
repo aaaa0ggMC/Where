@@ -123,6 +123,7 @@ Node * new_node(NodeKind kind, Token * tok);
 Node * new_binary(NodeKind kind, Node * lhs, Node * rhs, Token * tok);
 Node * new_unary(NodeKind kind, Node * expr, Token * tok);
 Node * new_num(long long val, Token * tok);
+Node * new_float(long double fval, Token * tok);
 Node * new_var(Token * tok);
 
 // 类型判断 helper（由 AST 层面判别）

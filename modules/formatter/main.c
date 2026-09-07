@@ -6,12 +6,12 @@
 #include <formatter/tokenizer.h>
 #include <formatter/ast.h>
 #include <formatter/parser.h>
+#include <formatter/format.h>
 
 /// 预留的token解析大小
 #define RESERVE_TOKENS 1024
 #define ERROR_CLEANUP {puts(help_message);exit(-1);}
 #define LOG(...) printf(__VA_ARGS__)
-
 
 static int is_number_token(enum TokenType type){
     return type == T_NUMBER ||
@@ -134,7 +134,6 @@ int main(int argc, const char * argv[]){
     }
     fclose(input_file);
     // 后面基本不会定义变量了，而且workflow很清晰，因此为了进行资源清理，使用goto
-    
     vector tokens = vec_new(sizeof(Token), RESERVE_TOKENS);
 
     // 词法分析
@@ -160,38 +159,49 @@ int main(int argc, const char * argv[]){
     if(!t_result.success) goto parse_tokens_failed;
 
     // 语法分析
-    stage_diagnoses parser_diagnoses = vec_new(sizeof(stage_diagnosis), 8);
-    Token * first_tok = (Token *)vec_begin(&tokens);
-    Node * ast_root = parse_ast(first_tok, &parser_diagnoses);
+    parser_result p_result = parse_ast(&tokens);
 
     for(
-        void * data = vec_begin(&parser_diagnoses); 
-        data != vec_end(&parser_diagnoses); 
-        data = vec_next(&parser_diagnoses, data)
+        void * data = vec_begin(&(p_result.diagnoses)); 
+        data != vec_end(&(p_result.diagnoses)); 
+        data = vec_next(&(p_result.diagnoses), data)
     ){
         stage_diagnosis * ana = data;
         LOG("%s \n", ana->message);
     }
 
-    if(parser_diagnoses.size > 0){
-        sd_delete(&parser_diagnoses);
-        if(ast_root) ast_free(ast_root);
+    if(!p_result.success){
+        parser_result_delete(&p_result);
         goto parse_ast_failed;
     }
-    sd_delete(&parser_diagnoses);
 
     // 输出AST结构
-    if(ast_root){
-        LOG("\nAST Hierarchy:\n");
-        print_ast(ast_root, 0);
+    if(p_result.root){
+        LOG("\nAST Structure:\n");
+        print_ast(p_result.root, 0);
     }
 
     // 如果有格式化需求进行格式化
+    if(p_result.root){
+        if(output_file_path){
+            FILE * out_fp = fopen(output_file_path, "w");
+            if(!out_fp){
+                fprintf(stderr, "Fatal Error: unable to open output file \"%s\" for writing.\n", output_file_path);
+            }else{
+                format_ast(p_result.root, out_fp);
+                fclose(out_fp);
+                LOG("\nFormatted code written to \"%s\"\n", output_file_path);
+            }
+        }else{
+            LOG("\nFormatted Code:\n```c\n");
+            format_ast(p_result.root, stdout);
+            LOG("```\n");
+        }
+    }
 
-    if(ast_root) ast_free(ast_root);
+    parser_result_delete(&p_result);
 
 parse_ast_failed:
-
 parse_tokens_failed:
     vec_delete(&tokens);
     free(file_buffer);

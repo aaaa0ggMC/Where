@@ -6,37 +6,96 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/// 辅助比较函数（参考 chibicc 设计）
-static inline int equal(Token * tok, const char * op){
-    if(!tok) return 0;
-    int len = strlen(op);
-    if(sv_length(tok->data) != len) return 0;
-    return memcmp(sv_begin(tok->data), op, len) == 0;
+/// 语法分析内部游标上下文（仅在本文件内使用）
+typedef struct {
+    vector * tokens;
+    int index;
+    int success;
+    stage_diagnoses * diagnoses;
+} parser_context;
+
+/// 获取当前 Token（不移动游标）
+static inline Token * parser_peek(parser_context * ctx){
+    if(!ctx || !ctx->tokens || ctx->index < 0 || ctx->index >= ctx->tokens->size) return NULL;
+    return (Token *)ctx->tokens->data + ctx->index;
 }
 
-static inline int consume(Token ** rest, Token * tok, const char * op){
-    if(equal(tok, op)){
-        *rest = tok->next;
+/// 前瞻第 n 个 Token（n=0 为当前 Token）
+static inline Token * parser_peek_n(parser_context * ctx, int n){
+    if(!ctx || !ctx->tokens) return NULL;
+    int idx = ctx->index + n;
+    if(idx < 0 || idx >= ctx->tokens->size) return NULL;
+    return (Token *)ctx->tokens->data + idx;
+}
+
+/// 获取当前 Token 并将游标向后移动一位
+static inline Token * parser_fetch(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    if(tok) ctx->index++;
+    return tok;
+}
+
+/// 检查当前 Token 类型是否匹配
+static inline int check(parser_context * ctx, enum TokenType type){
+    Token * tok = parser_peek(ctx);
+    return tok && tok->type == type;
+}
+
+/// 匹配并消耗指定类型的 Token，符合返回 1 并后移游标，否则返回 0
+static inline int consume(parser_context * ctx, enum TokenType type){
+    Token * tok = parser_peek(ctx);
+    if(tok && tok->type == type){
+        ctx->index++;
         return 1;
     }
-    *rest = tok;
     return 0;
 }
 
-static Token * skip(Token ** rest, Token * tok, const char * op, stage_diagnoses * diagnoses){
-    if(!equal(tok, op)){
-        if(tok){
-            sd_printf(diagnoses, "Expected '%s' at row %d col %d, but got \"%.*s\"",
-                op, tok->location.row, tok->location.col,
-                sv_length(tok->data), sv_begin(tok->data));
-        }else{
-            sd_printf(diagnoses, "Expected '%s', but reached EOF", op);
-        }
-        *rest = tok ? tok->next : NULL;
-        return *rest;
+static const char * token_type_name(enum TokenType type){
+    switch(type){
+        case T_END_STATEMENT: return ";";
+        case T_COMMA: return ",";
+        case T_OP_COLON: return ":";
+        case T_PARENTHESE_BEGIN: return "(";
+        case T_PARENTHESE_END: return ")";
+        case T_BRACE_BEGIN: return "{";
+        case T_BRACE_END: return "}";
+        case T_BRACKET_BEGIN: return "[";
+        case T_BRACKET_END: return "]";
+        case T_OP_ASSIGN: return "=";
+        case T_KW_IF: return "if";
+        case T_KW_ELSE: return "else";
+        case T_KW_WHILE: return "while";
+        case T_KW_DO: return "do";
+        case T_KW_FOR: return "for";
+        case T_KW_SWITCH: return "switch";
+        case T_KW_CASE: return "case";
+        case T_KW_DEFAULT: return "default";
+        case T_KW_RETURN: return "return";
+        case T_KW_BREAK: return "break";
+        case T_KW_CONTINUE: return "continue";
+        case T_KW_GOTO: return "goto";
+        default: return token_string(type);
     }
-    *rest = tok->next;
-    return tok->next;
+}
+
+/// 跳过指定类型的 Token，若不匹配则记录诊断信息
+static Token * skip(parser_context * ctx, enum TokenType type){
+    Token * tok = parser_peek(ctx);
+    if(!tok || tok->type != type){
+        if(tok){
+            sd_printf(ctx->diagnoses, "Expected '%s' at row %d col %d, but got \"%.*s\"",
+                token_type_name(type), tok->location.row, tok->location.col,
+                sv_length(tok->data), sv_begin(tok->data));
+            ctx->index++;
+        }else{
+            sd_printf(ctx->diagnoses, "Expected '%s', but reached EOF", token_type_name(type));
+        }
+        ctx->success = 0;
+        return NULL;
+    }
+    ctx->index++;
+    return tok;
 }
 
 /// AST层面判别内置类型
@@ -44,6 +103,10 @@ static inline int is_typename(Token * tok){
     if(!tok) return 0;
     if(tok->type != T_IDENTIFIER) return 0;
     return check_builtin_type(tok->data) != TY_NONE;
+}
+
+static inline int check_typename(parser_context * ctx){
+    return is_typename(parser_peek(ctx));
 }
 
 static inline int is_preprocessor(Token * tok){
@@ -59,633 +122,619 @@ static inline int is_preprocessor(Token * tok){
             tok->type == T_PP_ENDIF);
 }
 
-// 声明递归下降函数
-static Node * expr(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * assign(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * logor(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * logand(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * bitor(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * bitxor(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * bitand(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * equality(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * relational(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * add(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * mul(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * unary(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * postfix(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * primary(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
+static inline int check_preprocessor(parser_context * ctx){
+    return is_preprocessor(parser_peek(ctx));
+}
 
-static Node * stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * compound_stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * expr_stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
-static Node * declaration(Token ** rest, Token * tok, stage_diagnoses * diagnoses);
+static inline int is_number_token(enum TokenType type){
+    return (type == T_NUMBER || type == T_NUMBER_HEX ||
+            type == T_NUMBER_OCT || type == T_NUMBER_BIN ||
+            type == T_NUMBER_FLOAT);
+}
+
+// 声明递归下降函数
+static Node * expr(parser_context * ctx);
+static Node * assign(parser_context * ctx);
+static Node * logor(parser_context * ctx);
+static Node * logand(parser_context * ctx);
+static Node * bitor(parser_context * ctx);
+static Node * bitxor(parser_context * ctx);
+static Node * bitand(parser_context * ctx);
+static Node * equality(parser_context * ctx);
+static Node * relational(parser_context * ctx);
+static Node * add(parser_context * ctx);
+static Node * mul(parser_context * ctx);
+static Node * unary(parser_context * ctx);
+static Node * postfix(parser_context * ctx);
+static Node * primary(parser_context * ctx);
+
+static Node * stmt(parser_context * ctx);
+static Node * compound_stmt(parser_context * ctx);
+static Node * expr_stmt(parser_context * ctx);
+static Node * declaration(parser_context * ctx);
+static Node * parse_preprocessor(parser_context * ctx);
 
 /// primary = "(" expr ")" | NUM | STRING | CHAR | IDENT
-static Node * primary(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    if(!tok){
-        *rest = NULL;
-        return NULL;
-    }
+static Node * primary(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    if(!tok) return NULL;
 
-    if(equal(tok, "(")){
-        Node * node = expr(&tok, tok->next, diagnoses);
-        tok = skip(&tok, tok, ")", diagnoses);
-        *rest = tok;
+    if(consume(ctx, T_PARENTHESE_BEGIN)){
+        Node * node = expr(ctx);
+        skip(ctx, T_PARENTHESE_END);
         return node;
     }
 
-    if(tok->type == T_NUMBER || tok->type == T_NUMBER_HEX ||
-       tok->type == T_NUMBER_OCT || tok->type == T_NUMBER_BIN ||
-       tok->type == T_NUMBER_FLOAT){
-        Node * node = new_num(tok->ival.ull, tok);
-        node->fval = tok->ival.ld;
-        *rest = tok->next;
-        return node;
+    if(is_number_token(tok->type)){
+        ctx->index++;
+        if(tok->type == T_NUMBER_FLOAT){
+            return new_float(tok->ival.ld, tok);
+        }
+        return new_num(tok->ival.ull, tok);
     }
 
-    if(tok->type == T_STRING_LITERAL){
+    if(consume(ctx, T_STRING_LITERAL)){
         Node * node = new_node(ND_STRING, tok);
         node->str_val = tok->data;
-        *rest = tok->next;
         return node;
     }
 
-    if(tok->type == T_CHAR_LITERAL){
+    if(consume(ctx, T_CHAR_LITERAL)){
         Node * node = new_node(ND_CHAR, tok);
         node->str_val = tok->data;
-        *rest = tok->next;
         return node;
     }
 
-    if(tok->type == T_IDENTIFIER){
-        Node * node = new_var(tok);
-        *rest = tok->next;
-        return node;
+    if(consume(ctx, T_IDENTIFIER)){
+        return new_var(tok);
     }
 
-    sd_printf(diagnoses, "Unexpected token \"%.*s\" at row %d col %d in expression",
+    sd_printf(ctx->diagnoses, "Unexpected token \"%.*s\" at row %d col %d in expression",
         sv_length(tok->data), sv_begin(tok->data),
         tok->location.row, tok->location.col);
-    *rest = tok->next;
+    ctx->success = 0;
+    ctx->index++;
     return NULL;
 }
 
 /// postfix = primary ("(" func-args? ")" | "[" expr "]" | "++" | "--")*
-static Node * postfix(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = primary(&tok, tok, diagnoses);
+static Node * postfix(parser_context * ctx){
+    Node * node = primary(ctx);
 
-    while(tok){
-        if(equal(tok, "(")){
-            // 函数调用
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+
+        if(consume(ctx, T_PARENTHESE_BEGIN)){
             Node * call = new_node(ND_FUNCALL, tok);
             if(node && node->kind == ND_VAR){
                 call->name = node->name;
             }
-            tok = tok->next;
 
             Node arg_head = {};
             Node * arg_cur = &arg_head;
 
-            while(tok && !equal(tok, ")")){
-                Node * a = assign(&tok, tok, diagnoses);
+            while(!check(ctx, T_PARENTHESE_END) && parser_peek(ctx)){
+                Node * a = assign(ctx);
                 if(a){
                     arg_cur->next = a;
                     arg_cur = a;
                 }
-                if(!consume(&tok, tok, ",")){
+                if(!consume(ctx, T_COMMA)){
                     break;
                 }
             }
-            tok = skip(&tok, tok, ")", diagnoses);
+            skip(ctx, T_PARENTHESE_END);
             call->args = arg_head.next;
             node = call;
             continue;
         }
 
-        if(equal(tok, "[")){
-            // 数组下标访问
-            Token * start = tok;
-            tok = tok->next;
-            Node * idx = expr(&tok, tok, diagnoses);
-            tok = skip(&tok, tok, "]", diagnoses);
-            node = new_binary(ND_ADD, node, idx, start);
+        if(consume(ctx, T_BRACKET_BEGIN)){
+            Node * idx = expr(ctx);
+            skip(ctx, T_BRACKET_END);
+            node = new_binary(ND_ADD, node, idx, tok);
             continue;
         }
 
-        if(equal(tok, "++")){
+        if(consume(ctx, T_OP_INCREMENT)){
             node = new_unary(ND_POST_INC, node, tok);
-            tok = tok->next;
             continue;
         }
 
-        if(equal(tok, "--")){
+        if(consume(ctx, T_OP_DECREMENT)){
             node = new_unary(ND_POST_DEC, node, tok);
-            tok = tok->next;
             continue;
         }
 
         break;
     }
 
-    *rest = tok;
     return node;
 }
 
 /// unary = ("+" | "-" | "!" | "~" | "++" | "--") unary | postfix
-static Node * unary(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    if(equal(tok, "+")){
-        return new_unary(ND_POS, unary(rest, tok->next, diagnoses), tok);
-    }
-    if(equal(tok, "-")){
-        return new_unary(ND_NEG, unary(rest, tok->next, diagnoses), tok);
-    }
-    if(equal(tok, "!")){
-        return new_unary(ND_NOT, unary(rest, tok->next, diagnoses), tok);
-    }
-    if(equal(tok, "~")){
-        return new_unary(ND_BIT_NOT, unary(rest, tok->next, diagnoses), tok);
-    }
-    if(equal(tok, "++")){
-        return new_unary(ND_PRE_INC, unary(rest, tok->next, diagnoses), tok);
-    }
-    if(equal(tok, "--")){
-        return new_unary(ND_PRE_DEC, unary(rest, tok->next, diagnoses), tok);
-    }
+static Node * unary(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    if(!tok) return NULL;
 
-    return postfix(rest, tok, diagnoses);
+    if(consume(ctx, T_OP_ADD)) return new_unary(ND_POS, unary(ctx), tok);
+    if(consume(ctx, T_OP_MINUS)) return new_unary(ND_NEG, unary(ctx), tok);
+    if(consume(ctx, T_OP_NOT)) return new_unary(ND_NOT, unary(ctx), tok);
+    if(consume(ctx, T_OP_BIT_NOT)) return new_unary(ND_BIT_NOT, unary(ctx), tok);
+    if(consume(ctx, T_OP_INCREMENT)) return new_unary(ND_PRE_INC, unary(ctx), tok);
+    if(consume(ctx, T_OP_DECREMENT)) return new_unary(ND_PRE_DEC, unary(ctx), tok);
+
+    return postfix(ctx);
 }
 
 /// mul = unary ("*" unary | "/" unary | "%" unary)*
-static Node * mul(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = unary(&tok, tok, diagnoses);
+static Node * mul(parser_context * ctx){
+    Node * node = unary(ctx);
 
-    while(tok){
-        if(equal(tok, "*")){
-            node = new_binary(ND_MUL, node, unary(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_MUL)){
+            node = new_binary(ND_MUL, node, unary(ctx), tok);
+        }else if(consume(ctx, T_OP_DIV)){
+            node = new_binary(ND_DIV, node, unary(ctx), tok);
+        }else if(consume(ctx, T_OP_MOD)){
+            node = new_binary(ND_MOD, node, unary(ctx), tok);
+        }else{
+            break;
         }
-        if(equal(tok, "/")){
-            node = new_binary(ND_DIV, node, unary(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        if(equal(tok, "%")){
-            node = new_binary(ND_MOD, node, unary(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// add = mul ("+" mul | "-" mul)*
-static Node * add(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = mul(&tok, tok, diagnoses);
+static Node * add(parser_context * ctx){
+    Node * node = mul(ctx);
 
-    while(tok){
-        if(equal(tok, "+")){
-            node = new_binary(ND_ADD, node, mul(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_ADD)){
+            node = new_binary(ND_ADD, node, mul(ctx), tok);
+        }else if(consume(ctx, T_OP_MINUS)){
+            node = new_binary(ND_SUB, node, mul(ctx), tok);
+        }else{
+            break;
         }
-        if(equal(tok, "-")){
-            node = new_binary(ND_SUB, node, mul(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
-static Node * relational(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = add(&tok, tok, diagnoses);
+static Node * relational(parser_context * ctx){
+    Node * node = add(ctx);
 
-    while(tok){
-        if(equal(tok, "<=")){
-            node = new_binary(ND_LE, node, add(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_LT)){
+            node = new_binary(ND_LT, node, add(ctx), tok);
+        }else if(consume(ctx, T_OP_LE)){
+            node = new_binary(ND_LE, node, add(ctx), tok);
+        }else if(consume(ctx, T_OP_GT)){
+            node = new_binary(ND_GT, node, add(ctx), tok);
+        }else if(consume(ctx, T_OP_GE)){
+            node = new_binary(ND_GE, node, add(ctx), tok);
+        }else{
+            break;
         }
-        if(equal(tok, ">=")){
-            node = new_binary(ND_GE, node, add(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        if(equal(tok, "<")){
-            node = new_binary(ND_LT, node, add(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        if(equal(tok, ">")){
-            node = new_binary(ND_GT, node, add(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// equality = relational ("==" relational | "!=" relational)*
-static Node * equality(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = relational(&tok, tok, diagnoses);
+static Node * equality(parser_context * ctx){
+    Node * node = relational(ctx);
 
-    while(tok){
-        if(equal(tok, "==")){
-            node = new_binary(ND_EQ, node, relational(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_EQ)){
+            node = new_binary(ND_EQ, node, relational(ctx), tok);
+        }else if(consume(ctx, T_OP_NE)){
+            node = new_binary(ND_NE, node, relational(ctx), tok);
+        }else{
+            break;
         }
-        if(equal(tok, "!=")){
-            node = new_binary(ND_NE, node, relational(&tok, tok->next, diagnoses), tok);
-            continue;
-        }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// bitand = equality ("&" equality)*
-static Node * bitand(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = equality(&tok, tok, diagnoses);
+static Node * bitand(parser_context * ctx){
+    Node * node = equality(ctx);
 
-    while(tok){
-        if(equal(tok, "&")){
-            node = new_binary(ND_BIT_AND, node, equality(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_BIT_AND)){
+            node = new_binary(ND_BIT_AND, node, equality(ctx), tok);
+        }else{
+            break;
         }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// bitxor = bitand ("^" bitand)*
-static Node * bitxor(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = bitand(&tok, tok, diagnoses);
+static Node * bitxor(parser_context * ctx){
+    Node * node = bitand(ctx);
 
-    while(tok){
-        if(equal(tok, "^")){
-            node = new_binary(ND_BIT_XOR, node, bitand(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_BIT_XOR)){
+            node = new_binary(ND_BIT_XOR, node, bitand(ctx), tok);
+        }else{
+            break;
         }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// bitor = bitxor ("|" bitxor)*
-static Node * bitor(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = bitxor(&tok, tok, diagnoses);
+static Node * bitor(parser_context * ctx){
+    Node * node = bitxor(ctx);
 
-    while(tok){
-        if(equal(tok, "|")){
-            node = new_binary(ND_BIT_OR, node, bitxor(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_BIT_OR)){
+            node = new_binary(ND_BIT_OR, node, bitxor(ctx), tok);
+        }else{
+            break;
         }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// logand = bitor ("&&" bitor)*
-static Node * logand(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = bitor(&tok, tok, diagnoses);
+static Node * logand(parser_context * ctx){
+    Node * node = bitor(ctx);
 
-    while(tok){
-        if(equal(tok, "&&")){
-            node = new_binary(ND_LOGICAL_AND, node, bitor(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_LOGICAL_AND)){
+            node = new_binary(ND_LOGICAL_AND, node, bitor(ctx), tok);
+        }else{
+            break;
         }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// logor = logand ("||" logand)*
-static Node * logor(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = logand(&tok, tok, diagnoses);
+static Node * logor(parser_context * ctx){
+    Node * node = logand(ctx);
 
-    while(tok){
-        if(equal(tok, "||")){
-            node = new_binary(ND_LOGICAL_OR, node, logand(&tok, tok->next, diagnoses), tok);
-            continue;
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(consume(ctx, T_OP_LOGICAL_OR)){
+            node = new_binary(ND_LOGICAL_OR, node, logand(ctx), tok);
+        }else{
+            break;
         }
-        break;
     }
-
-    *rest = tok;
     return node;
 }
 
 /// assign = logor ("=" assign)?
-static Node * assign(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * node = logor(&tok, tok, diagnoses);
-
-    if(equal(tok, "=")){
-        node = new_binary(ND_ASSIGN, node, assign(&tok, tok->next, diagnoses), tok);
+static Node * assign(parser_context * ctx){
+    Node * node = logor(ctx);
+    Token * tok = parser_peek(ctx);
+    if(tok && consume(ctx, T_OP_ASSIGN)){
+        node = new_binary(ND_ASSIGN, node, assign(ctx), tok);
     }
-
-    *rest = tok;
     return node;
 }
 
 /// expr = assign
-static Node * expr(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    return assign(rest, tok, diagnoses);
+static Node * expr(parser_context * ctx){
+    return assign(ctx);
 }
 
 /// expr_stmt = expr? ";"
-static Node * expr_stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
+static Node * expr_stmt(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
     Node * node = new_node(ND_EXPR_STMT, tok);
-    if(!equal(tok, ";")){
-        node->lhs = expr(&tok, tok, diagnoses);
+    if(!check(ctx, T_END_STATEMENT)){
+        node->lhs = expr(ctx);
     }
-    tok = skip(&tok, tok, ";", diagnoses);
-    *rest = tok;
+    skip(ctx, T_END_STATEMENT);
     return node;
 }
 
-/// declaration = typename ident ("=" assign)? ("," ident ("=" assign)?)* ";"
-static Node * declaration(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Token * ty_tok = tok;
-    tok = tok->next;
-
+/// declaration = typename ident ("=" expr)? ("," ident ("=" expr)?)* ";"
+static Node * declaration(parser_context * ctx){
+    Token * ty_tok = parser_fetch(ctx);
     Node head = {};
     Node * cur = &head;
 
-    while(tok && tok->type == T_IDENTIFIER){
-        Token * name_tok = tok;
-        tok = tok->next;
+    while(1){
+        Token * var_tok = parser_peek(ctx);
+        if(!check(ctx, T_IDENTIFIER)){
+            sd_printf(ctx->diagnoses, "Expected variable name at row %d col %d",
+                var_tok ? var_tok->location.row : -1, var_tok ? var_tok->location.col : -1);
+            ctx->success = 0;
+            break;
+        }
+        parser_fetch(ctx);
 
-        Node * var_decl = new_node(ND_VAR_DECL, name_tok);
-        var_decl->type_name = ty_tok->data;
-        var_decl->builtin_type = check_builtin_type(ty_tok->data);
-        var_decl->name = name_tok->data;
+        Node * var = new_node(ND_VAR_DECL, var_tok);
+        var->type_name = ty_tok->data;
+        var->builtin_type = check_builtin_type(ty_tok->data);
+        var->name = var_tok->data;
 
-        if(consume(&tok, tok, "=")){
-            var_decl->lhs = assign(&tok, tok, diagnoses);
+        if(consume(ctx, T_OP_ASSIGN)){
+            var->lhs = assign(ctx);
         }
 
-        cur->next = var_decl;
-        cur = var_decl;
+        cur->next = var;
+        cur = var;
 
-        if(!consume(&tok, tok, ",")){
+        if(!consume(ctx, T_COMMA)){
             break;
         }
     }
 
-    tok = skip(&tok, tok, ";", diagnoses);
-    *rest = tok;
+    skip(ctx, T_END_STATEMENT);
     return head.next;
 }
 
 /// compound_stmt = "{" (declaration | stmt)* "}"
-static Node * compound_stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Node * block = new_node(ND_COMPOUND_STMT, tok);
-    tok = skip(&tok, tok, "{", diagnoses);
+static Node * compound_stmt(parser_context * ctx){
+    Token * start = parser_peek(ctx);
+    Node * block = new_node(ND_COMPOUND_STMT, start);
+    skip(ctx, T_BRACE_BEGIN);
 
     Node head = {};
     Node * cur = &head;
 
-    while(tok && !equal(tok, "}")){
-        if(equal(tok, ";")){
-            tok = tok->next;
+    while(!check(ctx, T_BRACE_END) && parser_peek(ctx)){
+        if(consume(ctx, T_END_STATEMENT)){
             continue;
         }
 
         Node * s = NULL;
-        if(is_typename(tok)){
-            s = declaration(&tok, tok, diagnoses);
+        if(check_preprocessor(ctx)){
+            s = parse_preprocessor(ctx);
+        }else if(check_typename(ctx)){
+            s = declaration(ctx);
         }else{
-            s = stmt(&tok, tok, diagnoses);
+            s = stmt(ctx);
         }
 
         if(s){
             cur->next = s;
             while(cur->next) cur = cur->next;
         }else{
-            if(tok) tok = tok->next;
+            if(parser_peek(ctx)) ctx->index++;
         }
     }
 
-    tok = skip(&tok, tok, "}", diagnoses);
+    skip(ctx, T_BRACE_END);
     block->body = head.next;
-    *rest = tok;
     return block;
 }
 
 /// stmt
-static Node * stmt(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    if(!tok){
-        *rest = NULL;
-        return NULL;
-    }
+static Node * stmt(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    if(!tok) return NULL;
 
-    if(equal(tok, "return")){
-        Node * node = new_node(ND_RETURN, tok);
-        tok = tok->next;
-        if(!equal(tok, ";")){
-            node->lhs = expr(&tok, tok, diagnoses);
-        }
-        tok = skip(&tok, tok, ";", diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "if")){
-        Node * node = new_node(ND_IF, tok);
-        tok = skip(&tok, tok->next, "(", diagnoses);
-        node->cond = expr(&tok, tok, diagnoses);
-        tok = skip(&tok, tok, ")", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        if(equal(tok, "else")){
-            node->els = stmt(&tok, tok->next, diagnoses);
-        }
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "while")){
-        Node * node = new_node(ND_WHILE, tok);
-        tok = skip(&tok, tok->next, "(", diagnoses);
-        node->cond = expr(&tok, tok, diagnoses);
-        tok = skip(&tok, tok, ")", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "do")){
-        Node * node = new_node(ND_DO, tok);
-        node->then = stmt(&tok, tok->next, diagnoses);
-        tok = skip(&tok, tok, "while", diagnoses);
-        tok = skip(&tok, tok, "(", diagnoses);
-        node->cond = expr(&tok, tok, diagnoses);
-        tok = skip(&tok, tok, ")", diagnoses);
-        tok = skip(&tok, tok, ";", diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "for")){
-        Node * node = new_node(ND_FOR, tok);
-        tok = skip(&tok, tok->next, "(", diagnoses);
-
-        if(!equal(tok, ";")){
-            if(is_typename(tok)){
-                node->init = declaration(&tok, tok, diagnoses);
-            }else{
-                node->init = expr_stmt(&tok, tok, diagnoses);
+    switch(tok->type){
+        case T_KW_RETURN: {
+            Node * node = new_node(ND_RETURN, tok);
+            ctx->index++;
+            if(!check(ctx, T_END_STATEMENT)){
+                node->lhs = expr(ctx);
             }
-        }else{
-            tok = tok->next;
+            skip(ctx, T_END_STATEMENT);
+            return node;
         }
 
-        if(!equal(tok, ";")){
-            node->cond = expr(&tok, tok, diagnoses);
+        case T_KW_IF: {
+            Node * node = new_node(ND_IF, tok);
+            ctx->index++;
+            skip(ctx, T_PARENTHESE_BEGIN);
+            node->cond = expr(ctx);
+            skip(ctx, T_PARENTHESE_END);
+            node->then = stmt(ctx);
+            if(consume(ctx, T_KW_ELSE)){
+                node->els = stmt(ctx);
+            }
+            return node;
         }
-        tok = skip(&tok, tok, ";", diagnoses);
 
-        if(!equal(tok, ")")){
-            node->inc = expr(&tok, tok, diagnoses);
+        case T_KW_WHILE: {
+            Node * node = new_node(ND_WHILE, tok);
+            ctx->index++;
+            skip(ctx, T_PARENTHESE_BEGIN);
+            node->cond = expr(ctx);
+            skip(ctx, T_PARENTHESE_END);
+            node->then = stmt(ctx);
+            return node;
         }
-        tok = skip(&tok, tok, ")", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        *rest = tok;
-        return node;
-    }
 
-    if(equal(tok, "switch")){
-        Node * node = new_node(ND_SWITCH, tok);
-        tok = skip(&tok, tok->next, "(", diagnoses);
-        node->cond = expr(&tok, tok, diagnoses);
-        tok = skip(&tok, tok, ")", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "case")){
-        Node * node = new_node(ND_CASE, tok);
-        node->lhs = expr(&tok, tok->next, diagnoses);
-        tok = skip(&tok, tok, ":", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "default")){
-        Node * node = new_node(ND_DEFAULT, tok);
-        tok = skip(&tok, tok->next, ":", diagnoses);
-        node->then = stmt(&tok, tok, diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "break")){
-        Node * node = new_node(ND_BREAK, tok);
-        tok = skip(&tok, tok->next, ";", diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "continue")){
-        Node * node = new_node(ND_CONTINUE, tok);
-        tok = skip(&tok, tok->next, ";", diagnoses);
-        *rest = tok;
-        return node;
-    }
-
-    if(equal(tok, "goto")){
-        Node * node = new_node(ND_GOTO, tok);
-        tok = tok->next;
-        if(tok && tok->type == T_IDENTIFIER){
-            node->name = tok->data;
-            tok = tok->next;
+        case T_KW_DO: {
+            Node * node = new_node(ND_DO, tok);
+            ctx->index++;
+            node->then = stmt(ctx);
+            skip(ctx, T_KW_WHILE);
+            skip(ctx, T_PARENTHESE_BEGIN);
+            node->cond = expr(ctx);
+            skip(ctx, T_PARENTHESE_END);
+            skip(ctx, T_END_STATEMENT);
+            return node;
         }
-        tok = skip(&tok, tok, ";", diagnoses);
-        *rest = tok;
-        return node;
-    }
 
-    if(equal(tok, "{")){
-        return compound_stmt(rest, tok, diagnoses);
-    }
+        case T_KW_FOR: {
+            Node * node = new_node(ND_FOR, tok);
+            ctx->index++;
+            skip(ctx, T_PARENTHESE_BEGIN);
 
-    if(is_typename(tok)){
-        return declaration(rest, tok, diagnoses);
-    }
+            if(!check(ctx, T_END_STATEMENT)){
+                if(check_typename(ctx)){
+                    node->init = declaration(ctx);
+                }else{
+                    node->init = expr_stmt(ctx);
+                }
+            }else{
+                ctx->index++;
+            }
 
-    return expr_stmt(rest, tok, diagnoses);
+            if(!check(ctx, T_END_STATEMENT)){
+                node->cond = expr(ctx);
+            }
+            skip(ctx, T_END_STATEMENT);
+
+            if(!check(ctx, T_PARENTHESE_END)){
+                node->inc = expr(ctx);
+            }
+            skip(ctx, T_PARENTHESE_END);
+            node->then = stmt(ctx);
+            return node;
+        }
+
+        case T_KW_SWITCH: {
+            Node * node = new_node(ND_SWITCH, tok);
+            ctx->index++;
+            skip(ctx, T_PARENTHESE_BEGIN);
+            node->cond = expr(ctx);
+            skip(ctx, T_PARENTHESE_END);
+            node->then = stmt(ctx);
+            return node;
+        }
+
+        case T_KW_CASE: {
+            Node * node = new_node(ND_CASE, tok);
+            ctx->index++;
+            node->lhs = expr(ctx);
+            skip(ctx, T_OP_COLON);
+            node->then = stmt(ctx);
+            return node;
+        }
+
+        case T_KW_DEFAULT: {
+            Node * node = new_node(ND_DEFAULT, tok);
+            ctx->index++;
+            skip(ctx, T_OP_COLON);
+            node->then = stmt(ctx);
+            return node;
+        }
+
+        case T_KW_BREAK: {
+            Node * node = new_node(ND_BREAK, tok);
+            ctx->index++;
+            skip(ctx, T_END_STATEMENT);
+            return node;
+        }
+
+        case T_KW_CONTINUE: {
+            Node * node = new_node(ND_CONTINUE, tok);
+            ctx->index++;
+            skip(ctx, T_END_STATEMENT);
+            return node;
+        }
+
+        case T_KW_GOTO: {
+            Node * node = new_node(ND_GOTO, tok);
+            ctx->index++;
+            Token * name_tok = parser_peek(ctx);
+            if(consume(ctx, T_IDENTIFIER)){
+                node->name = name_tok->data;
+            }
+            skip(ctx, T_END_STATEMENT);
+            return node;
+        }
+
+        case T_BRACE_BEGIN:
+            return compound_stmt(ctx);
+
+        default:
+            if(check_preprocessor(ctx)){
+                return parse_preprocessor(ctx);
+            }
+            if(check_typename(ctx)){
+                return declaration(ctx);
+            }
+            return expr_stmt(ctx);
+    }
 }
 
 /// 预处理指令解析
-static Node * parse_preprocessor(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    (void)diagnoses;
+static Node * parse_preprocessor(parser_context * ctx){
+    Token * tok = parser_fetch(ctx);
+    if(!tok) return NULL;
+
     Node * pp = new_node(ND_PREPROCESS, tok);
-    Token * cur = tok->next;
+    Token * cur = parser_peek(ctx);
 
     if(tok->type == T_PP_INCLUDE){
         if(cur && (cur->type == T_HEADER_NAME || cur->type == T_STRING_LITERAL)){
             pp->rhs = new_node(ND_STRING, cur);
             pp->rhs->str_val = cur->data;
-            cur = cur->next;
+            ctx->index++;
         }
     }else if(tok->type == T_PP_DEFINE){
         if(cur && cur->type == T_IDENTIFIER){
             pp->lhs = new_var(cur);
-            cur = cur->next;
-            if(cur && (cur->type == T_NUMBER || cur->type == T_NUMBER_HEX ||
-                       cur->type == T_STRING_LITERAL || cur->type == T_IDENTIFIER)){
+            ctx->index++;
+            cur = parser_peek(ctx);
+            if(cur && (is_number_token(cur->type) || cur->type == T_STRING_LITERAL || cur->type == T_IDENTIFIER)){
                 pp->rhs = new_var(cur);
-                cur = cur->next;
+                ctx->index++;
             }
         }
-    }else if(tok->type == T_PP_UNDEF){
+    }else if(tok->type == T_PP_UNDEF || tok->type == T_PP_IFDEF || tok->type == T_PP_IFNDEF){
         if(cur && cur->type == T_IDENTIFIER){
             pp->lhs = new_var(cur);
-            cur = cur->next;
+            ctx->index++;
         }
     }
 
-    *rest = cur;
+    // 确保同一行的剩余 token 归属于该预处理指令，跳过防止干扰后续语句
+    while(1){
+        Token * next = parser_peek(ctx);
+        if(next && next->location.row == tok->location.row){
+            ctx->index++;
+        }else{
+            break;
+        }
+    }
+
     return pp;
 }
 
-static inline int is_function(Token * tok){
-    if(!tok || !tok->next || !tok->next->next) return 0;
-    return (tok->next->type == T_IDENTIFIER && equal(tok->next->next, "("));
+static inline int is_function(parser_context * ctx){
+    Token * t1 = parser_peek_n(ctx, 1);
+    Token * t2 = parser_peek_n(ctx, 2);
+    return (t1 && t1->type == T_IDENTIFIER && t2 && t2->type == T_PARENTHESE_BEGIN);
 }
 
 /// 函数定义与函数声明
-static Node * parse_function(Token ** rest, Token * tok, stage_diagnoses * diagnoses){
-    Token * ty_tok = tok;
-    tok = tok->next;
-    Token * name_tok = tok;
-    tok = tok->next;
-    tok = skip(&tok, tok, "(", diagnoses);
+static Node * parse_function(parser_context * ctx){
+    Token * ty_tok = parser_fetch(ctx);
+    Token * name_tok = parser_fetch(ctx);
+    skip(ctx, T_PARENTHESE_BEGIN);
 
     Node param_head = {};
     Node * param_cur = &param_head;
 
-    while(tok && !equal(tok, ")")){
-        if(is_typename(tok)){
-            Token * p_ty = tok;
-            tok = tok->next;
+    while(!check(ctx, T_PARENTHESE_END) && parser_peek(ctx)){
+        if(check_typename(ctx)){
+            Token * p_ty = parser_fetch(ctx);
             Token * p_name = NULL;
-            if(tok && tok->type == T_IDENTIFIER){
-                p_name = tok;
-                tok = tok->next;
+            if(check(ctx, T_IDENTIFIER)){
+                p_name = parser_fetch(ctx);
             }
             Node * p_node = new_node(ND_VAR_DECL, p_name ? p_name : p_ty);
             p_node->type_name = p_ty->data;
@@ -696,57 +745,72 @@ static Node * parse_function(Token ** rest, Token * tok, stage_diagnoses * diagn
             param_cur->next = p_node;
             param_cur = p_node;
         }else{
-            sd_printf(diagnoses, "Expected parameter type at row %d col %d", 
-                tok->location.row, tok->location.col);
-            tok = tok->next;
+            Token * cur = parser_peek(ctx);
+            sd_printf(ctx->diagnoses, "Expected parameter type at row %d col %d", 
+                cur ? cur->location.row : -1, cur ? cur->location.col : -1);
+            ctx->success = 0;
+            if(cur) ctx->index++;
         }
 
-        if(!consume(&tok, tok, ",")){
+        if(!consume(ctx, T_COMMA)){
             break;
         }
     }
-    tok = skip(&tok, tok, ")", diagnoses);
+    skip(ctx, T_PARENTHESE_END);
 
-    if(equal(tok, ";")){
+    if(consume(ctx, T_END_STATEMENT)){
         Node * decl = new_node(ND_FUNC_DECL, name_tok);
         decl->type_name = ty_tok->data;
         decl->builtin_type = check_builtin_type(ty_tok->data);
         decl->name = name_tok->data;
         decl->args = param_head.next;
-        tok = tok->next;
-        *rest = tok;
         return decl;
-    }else if(equal(tok, "{")){
+    }else if(check(ctx, T_BRACE_BEGIN)){
         Node * def = new_node(ND_FUNC_DEF, name_tok);
         def->type_name = ty_tok->data;
         def->builtin_type = check_builtin_type(ty_tok->data);
         def->name = name_tok->data;
         def->args = param_head.next;
-        def->body = compound_stmt(&tok, tok, diagnoses);
-        *rest = tok;
+        def->body = compound_stmt(ctx);
         return def;
     }else{
-        sd_printf(diagnoses, "Expected ';' or '{' after function declarator at row %d col %d",
+        Token * tok = parser_peek(ctx);
+        sd_printf(ctx->diagnoses, "Expected ';' or '{' after function declarator at row %d col %d",
             tok ? tok->location.row : -1, tok ? tok->location.col : -1);
-        *rest = tok;
+        ctx->success = 0;
         return NULL;
     }
 }
 
 /// 语法分析总入口
-Node * parse_ast(Token * tok, stage_diagnoses * diagnoses){
-    Node * prog = new_node(ND_PROGRAM, tok);
+parser_result parse_ast(vector * tokens){
+    parser_result result = {
+        .success = 1,
+        .root = NULL,
+        .diagnoses = vec_new(sizeof(stage_diagnosis), 8)
+    };
+    if(!tokens || tokens->size == 0) return result;
+
+    parser_context context = {
+        .tokens = tokens,
+        .index = 0,
+        .success = 1,
+        .diagnoses = &(result.diagnoses)
+    };
+    parser_context * ctx = &context;
+
+    Token * first_tok = parser_peek(ctx);
+    Node * prog = new_node(ND_PROGRAM, first_tok);
     Node head = {};
     Node * cur = &head;
 
-    while(tok){
-        if(equal(tok, ";")){
-            tok = tok->next;
+    while(parser_peek(ctx)){
+        if(consume(ctx, T_END_STATEMENT)){
             continue;
         }
 
-        if(is_preprocessor(tok)){
-            Node * pp = parse_preprocessor(&tok, tok, diagnoses);
+        if(check_preprocessor(ctx)){
+            Node * pp = parse_preprocessor(ctx);
             if(pp){
                 cur->next = pp;
                 cur = pp;
@@ -754,15 +818,15 @@ Node * parse_ast(Token * tok, stage_diagnoses * diagnoses){
             continue;
         }
 
-        if(is_typename(tok)){
-            if(is_function(tok)){
-                Node * fn = parse_function(&tok, tok, diagnoses);
+        if(check_typename(ctx)){
+            if(is_function(ctx)){
+                Node * fn = parse_function(ctx);
                 if(fn){
                     cur->next = fn;
                     cur = fn;
                 }
             }else{
-                Node * gvar = declaration(&tok, tok, diagnoses);
+                Node * gvar = declaration(ctx);
                 if(gvar){
                     cur->next = gvar;
                     while(cur->next) cur = cur->next;
@@ -771,15 +835,26 @@ Node * parse_ast(Token * tok, stage_diagnoses * diagnoses){
             continue;
         }
 
-        Node * s = stmt(&tok, tok, diagnoses);
+        Node * s = stmt(ctx);
         if(s){
             cur->next = s;
             while(cur->next) cur = cur->next;
         }else{
-            if(tok) tok = tok->next;
+            if(parser_peek(ctx)) ctx->index++;
         }
     }
 
     prog->body = head.next;
-    return prog;
+    result.root = prog;
+    result.success = ctx->success && (result.diagnoses.size == 0);
+    return result;
+}
+
+void parser_result_delete(parser_result * res){
+    if(!res) return;
+    sd_delete(&(res->diagnoses));
+    if(res->root){
+        ast_free(res->root);
+        res->root = NULL;
+    }
 }

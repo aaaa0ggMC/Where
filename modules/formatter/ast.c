@@ -29,6 +29,12 @@ Node * new_num(long long val, Token * tok){
     return node;
 }
 
+Node * new_float(long double fval, Token * tok){
+    Node * node = new_node(ND_NUM, tok);
+    node->fval = fval;
+    return node;
+}
+
 Node * new_var(Token * tok){
     Node * node = new_node(ND_VAR, tok);
     if(tok){
@@ -138,7 +144,11 @@ void print_ast(Node * node, int depth){
 
     switch(node->kind){
         case ND_NUM:
-            printf(" %lld\n", node->val);
+            if(node->tok && node->tok->type == T_NUMBER_FLOAT){
+                printf(" %.*s\n", sv_length(node->tok->data), sv_begin(node->tok->data));
+            }else{
+                printf(" %lld\n", node->val);
+            }
             break;
         case ND_STRING:
         case ND_CHAR:

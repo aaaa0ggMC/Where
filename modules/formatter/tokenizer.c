@@ -257,8 +257,7 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
                 .data = sv_substr(context->sv, s_start, context->index - s_start),
                 .location = context->location,
                 .itype = I_VOID,
-                .ival = { .ld = 0 },
-                .next = NULL
+                .ival = { .ld = 0 }
             };
             ADD_TOKEN(vec, token);
         }else if(peek == '\''){
@@ -286,8 +285,7 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
                 .data = sv_substr(context->sv, c_start, context->index - c_start),
                 .location = context->location,
                 .itype = I_VOID,
-                .ival = { .ld = 0 },
-                .next = NULL
+                .ival = { .ld = 0 }
             };
             ADD_TOKEN(vec, token);
         }else if(ch_begin_preprocessor(peek)){
@@ -327,8 +325,7 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
                 .data = sv_substr(context->sv, pp_start, context->index - pp_start),
                 .location = context->location,
                 .itype = I_VOID,
-                .ival = { .ld = 0 },
-                .next = NULL
+                .ival = { .ld = 0 }
             };
             ADD_TOKEN(vec, pp_token);
 
@@ -348,8 +345,7 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
                         .data = sv_substr(context->sv, h_start, context->index - h_start),
                         .location = context->location,
                         .itype = I_VOID,
-                        .ival = { .ld = 0 },
-                        .next = NULL
+                        .ival = { .ld = 0 }
                     };
                     ADD_TOKEN(vec, h_token);
                 }
@@ -378,19 +374,6 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
             // 失败了
             result.success = 0;
         }
-    }
-
-    // 串联所有 token 为单链表，便于 parser 前瞻与遍历
-    Token * prev_tok = NULL;
-    for(
-        void * data = vec_begin(vec); 
-        data != vec_end(vec); 
-        data = vec_next(vec, data)
-    ){
-        Token * cur = (Token*)data;
-        cur->next = NULL;
-        if(prev_tok) prev_tok->next = cur;
-        prev_tok = cur;
     }
 
     return result;
