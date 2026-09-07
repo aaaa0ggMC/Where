@@ -35,6 +35,76 @@ static inline Token * parser_fetch(parser_context * ctx){
     return tok;
 }
 
+static inline int is_comment_token(enum TokenType type){
+    return (type == T_COMMENT_SINGLE_LINE ||
+            type == T_BEGIN_COMMENT_MULTIPLE_LINES ||
+            type == T_COMMENT_BODY ||
+            type == T_END_COMMENT_MULTIPLE_LINES);
+}
+
+static inline int check_comment(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    return tok && (tok->type == T_COMMENT_SINGLE_LINE ||
+                   tok->type == T_BEGIN_COMMENT_MULTIPLE_LINES);
+}
+
+static inline void skip_inline_comments(parser_context * ctx){
+    while(1){
+        Token * tok = parser_peek(ctx);
+        if(!tok) break;
+        if(tok->type == T_COMMENT_SINGLE_LINE){
+            parser_fetch(ctx);
+            Token * body = parser_peek(ctx);
+            if(body && body->type == T_COMMENT_BODY){
+                parser_fetch(ctx);
+            }
+        }else if(tok->type == T_BEGIN_COMMENT_MULTIPLE_LINES){
+            parser_fetch(ctx);
+            while(parser_peek(ctx)){
+                Token * cur = parser_fetch(ctx);
+                if(cur->type == T_END_COMMENT_MULTIPLE_LINES){
+                    break;
+                }
+            }
+        }else if(tok->type == T_COMMENT_BODY || tok->type == T_END_COMMENT_MULTIPLE_LINES){
+            parser_fetch(ctx);
+        }else{
+            break;
+        }
+    }
+}
+
+static Node * parse_comment(parser_context * ctx){
+    Token * lead = parser_fetch(ctx);
+    if(!lead) return NULL;
+
+    Node * node = new_node(ND_COMMENT, lead);
+
+    if(lead->type == T_COMMENT_SINGLE_LINE){
+        Token * body = parser_peek(ctx);
+        if(body && body->type == T_COMMENT_BODY){
+            parser_fetch(ctx);
+            int len = (body->data.begin + body->data.length) - lead->data.begin;
+            node->str_val = sv_build(lead->data.buffer, lead->data.begin, len);
+        }else{
+            node->str_val = lead->data;
+        }
+    }else if(lead->type == T_BEGIN_COMMENT_MULTIPLE_LINES){
+        int total_len = lead->data.length;
+        while(parser_peek(ctx)){
+            Token * cur = parser_fetch(ctx);
+            total_len = (cur->data.begin + cur->data.length) - lead->data.begin;
+            if(cur->type == T_END_COMMENT_MULTIPLE_LINES){
+                break;
+            }
+        }
+        node->str_val = sv_build(lead->data.buffer, lead->data.begin, total_len);
+    }else{
+        node->str_val = lead->data;
+    }
+    return node;
+}
+
 /// 检查当前 Token 类型是否匹配
 static inline int check(parser_context * ctx, enum TokenType type){
     Token * tok = parser_peek(ctx);
@@ -43,6 +113,7 @@ static inline int check(parser_context * ctx, enum TokenType type){
 
 /// 匹配并消耗指定类型的 Token，符合返回 1 并后移游标，否则返回 0
 static inline int consume(parser_context * ctx, enum TokenType type){
+    skip_inline_comments(ctx);
     Token * tok = parser_peek(ctx);
     if(tok && tok->type == type){
         ctx->index++;
@@ -81,6 +152,7 @@ static const char * token_type_name(enum TokenType type){
 
 /// 跳过指定类型的 Token，若不匹配则记录诊断信息
 static Token * skip(parser_context * ctx, enum TokenType type){
+    skip_inline_comments(ctx);
     Token * tok = parser_peek(ctx);
     if(!tok || tok->type != type){
         if(tok){
@@ -156,6 +228,7 @@ static Node * parse_preprocessor(parser_context * ctx);
 
 /// primary = "(" expr ")" | NUM | STRING | CHAR | IDENT
 static Node * primary(parser_context * ctx){
+    skip_inline_comments(ctx);
     Token * tok = parser_peek(ctx);
     if(!tok) return NULL;
 
@@ -233,7 +306,7 @@ static Node * postfix(parser_context * ctx){
         if(consume(ctx, T_BRACKET_BEGIN)){
             Node * idx = expr(ctx);
             skip(ctx, T_BRACKET_END);
-            node = new_binary(ND_ADD, node, idx, tok);
+            node = new_binary(ND_INDEX, node, idx, tok);
             continue;
         }
 
@@ -455,10 +528,11 @@ static Node * expr_stmt(parser_context * ctx){
 /// declaration = typename ident ("=" expr)? ("," ident ("=" expr)?)* ";"
 static Node * declaration(parser_context * ctx){
     Token * ty_tok = parser_fetch(ctx);
-    Node head = {};
-    Node * cur = &head;
+    Node * first_var = NULL;
+    Node * last_sub = NULL;
 
     while(1){
+        skip_inline_comments(ctx);
         Token * var_tok = parser_peek(ctx);
         if(!check(ctx, T_IDENTIFIER)){
             sd_printf(ctx->diagnoses, "Expected variable name at row %d col %d",
@@ -477,8 +551,16 @@ static Node * declaration(parser_context * ctx){
             var->lhs = assign(ctx);
         }
 
-        cur->next = var;
-        cur = var;
+        if(!first_var){
+            first_var = var;
+        }else{
+            if(!last_sub){
+                first_var->args = var;
+            }else{
+                last_sub->next = var;
+            }
+            last_sub = var;
+        }
 
         if(!consume(ctx, T_COMMA)){
             break;
@@ -486,7 +568,7 @@ static Node * declaration(parser_context * ctx){
     }
 
     skip(ctx, T_END_STATEMENT);
-    return head.next;
+    return first_var;
 }
 
 /// compound_stmt = "{" (declaration | stmt)* "}"
@@ -499,6 +581,15 @@ static Node * compound_stmt(parser_context * ctx){
     Node * cur = &head;
 
     while(!check(ctx, T_BRACE_END) && parser_peek(ctx)){
+        if(check_comment(ctx)){
+            Node * c = parse_comment(ctx);
+            if(c){
+                cur->next = c;
+                cur = c;
+            }
+            continue;
+        }
+
         if(consume(ctx, T_END_STATEMENT)){
             continue;
         }
@@ -529,6 +620,10 @@ static Node * compound_stmt(parser_context * ctx){
 static Node * stmt(parser_context * ctx){
     Token * tok = parser_peek(ctx);
     if(!tok) return NULL;
+
+    if(check_comment(ctx)){
+        return parse_comment(ctx);
+    }
 
     switch(tok->type){
         case T_KW_RETURN: {
@@ -660,11 +755,21 @@ static Node * stmt(parser_context * ctx){
             return compound_stmt(ctx);
 
         default:
+            if(check_comment(ctx)){
+                return parse_comment(ctx);
+            }
             if(check_preprocessor(ctx)){
                 return parse_preprocessor(ctx);
             }
             if(check_typename(ctx)){
                 return declaration(ctx);
+            }
+            if(check(ctx, T_IDENTIFIER) && parser_peek_n(ctx, 1) && parser_peek_n(ctx, 1)->type == T_OP_COLON){
+                Token * lbl_tok = parser_fetch(ctx);
+                parser_fetch(ctx); // consume ':'
+                Node * lbl = new_node(ND_LABEL, lbl_tok);
+                lbl->name = lbl_tok->data;
+                return lbl;
             }
             return expr_stmt(ctx);
     }
@@ -730,9 +835,12 @@ static Node * parse_function(parser_context * ctx){
     Node * param_cur = &param_head;
 
     while(!check(ctx, T_PARENTHESE_END) && parser_peek(ctx)){
+        skip_inline_comments(ctx);
+        if(check(ctx, T_PARENTHESE_END)) break;
         if(check_typename(ctx)){
             Token * p_ty = parser_fetch(ctx);
             Token * p_name = NULL;
+            skip_inline_comments(ctx);
             if(check(ctx, T_IDENTIFIER)){
                 p_name = parser_fetch(ctx);
             }
@@ -805,6 +913,15 @@ parser_result parse_ast(vector * tokens){
     Node * cur = &head;
 
     while(parser_peek(ctx)){
+        if(check_comment(ctx)){
+            Node * c = parse_comment(ctx);
+            if(c){
+                cur->next = c;
+                cur = c;
+            }
+            continue;
+        }
+
         if(consume(ctx, T_END_STATEMENT)){
             continue;
         }

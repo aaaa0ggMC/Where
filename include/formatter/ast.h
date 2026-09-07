@@ -73,10 +73,12 @@ typedef enum {
     ND_GOTO,          // goto
     ND_LABEL,         // 标签定义
     ND_FUNCALL,       // 函数调用 (args 为实参链表)
+    ND_INDEX,         // 数组下标运算 a[i] (lhs 为基地址, rhs 为索引)
     ND_VAR_DECL,      // 变量声明 (类型, 变量名, 可选初值)
     ND_FUNC_DEF,      // 函数定义 (返回值类型, 函数名, 参数, 函数体)
     ND_FUNC_DECL,     // 函数声明 (返回值类型, 函数名, 参数)
     ND_PREPROCESS,    // 预处理指令节点 (#include, #define 等)
+    ND_COMMENT,       // 注释节点 (单行或多行注释)
     ND_PROGRAM        // 顶层程序节点 (连接外部定义序列)
 } NodeKind;
 
@@ -84,24 +86,24 @@ typedef struct Node Node;
 
 struct Node {
     NodeKind kind;
-    Node * next;       // 链表指针（语句序列、外部定义序列、形参/实参链表、case链等）
-    Token * tok;       // 代表性 Token（用于位置追踪和报错）
+    Node * next; // 链表指针（语句序列、外部定义序列、形参/实参链表、case链等）
+    Token * tok; // 代表性 Token（用于位置追踪和报错）
 
-    Node * lhs;        // 左子树
-    Node * rhs;        // 右子树
+    Node * lhs; // 左子树
+    Node * rhs; // 右子树
 
     // 控制流语句
-    Node * cond;       // 条件表达式
-    Node * then;       // 满足条件时的分支或循环体
-    Node * els;        // else 分支
-    Node * init;       // for 初始化
-    Node * inc;        // for 步进递增
+    Node * cond; // 条件表达式
+    Node * then; // 满足条件时的分支或循环体
+    Node * els; // else 分支
+    Node * init; // for 初始化
+    Node * inc; // for 步进递增
 
     // 块 / 函数体
     Node * body;
 
     // 变量声明、函数声明/定义
-    string_view name;      // 标识符名称
+    string_view name; // 标识符名称
     BuiltinType builtin_type; // AST识别出的内建类型
     string_view type_name; // 原始类型字符串
 

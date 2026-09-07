@@ -120,10 +120,12 @@ const char * node_kind_name(NodeKind kind){
         case ND_GOTO: return "GOTO";
         case ND_LABEL: return "LABEL";
         case ND_FUNCALL: return "FUNCALL";
+        case ND_INDEX: return "INDEX";
         case ND_VAR_DECL: return "VAR_DECL";
         case ND_FUNC_DEF: return "FUNC_DEF";
         case ND_FUNC_DECL: return "FUNC_DECL";
         case ND_PREPROCESS: return "PREPROCESS";
+        case ND_COMMENT: return "COMMENT";
         case ND_PROGRAM: return "PROGRAM";
     }
     return "?";
@@ -165,6 +167,17 @@ void print_ast(Node * node, int depth){
                 print_indent(depth + 1);
                 printf("init:\n");
                 print_ast(node->lhs, depth + 2);
+            }
+            for(Node * sub = node->args; sub; sub = sub->next){
+                print_indent(depth);
+                printf("VAR_DECL (multi) type: %.*s name: %.*s\n",
+                    sv_length(sub->type_name), sv_begin(sub->type_name),
+                    sv_length(sub->name), sv_begin(sub->name));
+                if(sub->lhs){
+                    print_indent(depth + 1);
+                    printf("init:\n");
+                    print_ast(sub->lhs, depth + 2);
+                }
             }
             break;
         case ND_FUNC_DEF:
@@ -304,6 +317,12 @@ void print_ast(Node * node, int depth){
             if(node->lhs){
                 print_ast(node->lhs, depth + 1);
             }
+            break;
+        case ND_COMMENT:
+            printf(" %.*s\n", sv_length(node->str_val), sv_begin(node->str_val));
+            break;
+        case ND_LABEL:
+            printf(" %.*s:\n", sv_length(node->name), sv_begin(node->name));
             break;
         default:
             printf("\n");

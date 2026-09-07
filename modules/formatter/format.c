@@ -21,7 +21,9 @@ static void format_expr(Node * node, FILE * out){
 
     switch(node->kind){
         case ND_NUM:
-            if(node->tok && (node->tok->type == T_NUMBER_FLOAT)){
+            if(node->tok && sv_length(node->tok->data) > 0){
+                fprintf(out, "%.*s", sv_length(node->tok->data), sv_begin(node->tok->data));
+            }else if(node->tok && (node->tok->type == T_NUMBER_FLOAT)){
                 fprintf(out, "%Lg", node->fval);
             }else{
                 fprintf(out, "%lld", node->val);
@@ -114,10 +116,65 @@ static void format_expr(Node * node, FILE * out){
             fputc(')', out);
             break;
 
+        case ND_INDEX:
+            format_expr(node->lhs, out);
+            fputc('[', out);
+            format_expr(node->rhs, out);
+            fputc(']', out);
+            break;
+
         default:
             if(node->lhs) format_expr(node->lhs, out);
             if(node->rhs) format_expr(node->rhs, out);
             break;
+    }
+}
+
+static void format_if(Node * node, FILE * out, int depth, int indent_first){
+    if(!node) return;
+    if(indent_first) write_indent(out, depth);
+    fputs("if (", out);
+    format_expr(node->cond, out);
+    fputs(")", out);
+
+    if(node->then && node->then->kind == ND_COMPOUND_STMT){
+        fputs(" {\n", out);
+        for(Node * cur = node->then->body; cur; cur = cur->next){
+            format_stmt(cur, out, depth + 1);
+        }
+        write_indent(out, depth);
+        fputs("}", out);
+    }else{
+        fputc('\n', out);
+        format_stmt(node->then, out, depth + 1);
+    }
+
+    if(node->els){
+        if(node->then && node->then->kind == ND_COMPOUND_STMT){
+            fputs(" else", out);
+        }else{
+            write_indent(out, depth);
+            fputs("else", out);
+        }
+
+        if(node->els->kind == ND_COMPOUND_STMT){
+            fputs(" {\n", out);
+            for(Node * cur = node->els->body; cur; cur = cur->next){
+                format_stmt(cur, out, depth + 1);
+            }
+            write_indent(out, depth);
+            fputs("}\n", out);
+        }else if(node->els->kind == ND_IF){
+            fputc(' ', out);
+            format_if(node->els, out, depth, 0);
+        }else{
+            fputc('\n', out);
+            format_stmt(node->els, out, depth + 1);
+        }
+    }else{
+        if(node->then && node->then->kind == ND_COMPOUND_STMT){
+            fputc('\n', out);
+        }
     }
 }
 
@@ -148,14 +205,11 @@ static void format_stmt(Node * node, FILE * out, int depth){
                 fputs(" = ", out);
                 format_expr(node->lhs, out);
             }
-            // 同一行的同类型连续变量声明合并（如 int i, j;）
-            while(node->next && node->next->kind == ND_VAR_DECL &&
-                  sv_equals(node->next->type_name, node->type_name)){
-                node = node->next;
-                fprintf(out, ", %.*s", sv_length(node->name), sv_begin(node->name));
-                if(node->lhs){
+            for(Node * sub = node->args; sub; sub = sub->next){
+                fprintf(out, ", %.*s", sv_length(sub->name), sv_begin(sub->name));
+                if(sub->lhs){
                     fputs(" = ", out);
-                    format_expr(node->lhs, out);
+                    format_expr(sub->lhs, out);
                 }
             }
             fputs(";\n", out);
@@ -166,13 +220,6 @@ static void format_stmt(Node * node, FILE * out, int depth){
             fputs("{\n", out);
             for(Node * cur = node->body; cur; cur = cur->next){
                 format_stmt(cur, out, depth + 1);
-                // 跳过已在 format_stmt 中合并的连续变量声明
-                if(cur->kind == ND_VAR_DECL){
-                    while(cur->next && cur->next->kind == ND_VAR_DECL &&
-                          sv_equals(cur->next->type_name, cur->type_name)){
-                        cur = cur->next;
-                    }
-                }
             }
             write_indent(out, depth);
             fputs("}\n", out);
@@ -185,63 +232,7 @@ static void format_stmt(Node * node, FILE * out, int depth){
             break;
 
         case ND_IF:
-            write_indent(out, depth);
-            fputs("if (", out);
-            format_expr(node->cond, out);
-            fputs(")", out);
-
-            if(node->then && node->then->kind == ND_COMPOUND_STMT){
-                fputs(" {\n", out);
-                for(Node * cur = node->then->body; cur; cur = cur->next){
-                    format_stmt(cur, out, depth + 1);
-                    if(cur->kind == ND_VAR_DECL){
-                        while(cur->next && cur->next->kind == ND_VAR_DECL &&
-                              sv_equals(cur->next->type_name, cur->type_name)){
-                            cur = cur->next;
-                        }
-                    }
-                }
-                write_indent(out, depth);
-                fputs("}", out);
-            }else{
-                fputc('\n', out);
-                format_stmt(node->then, out, depth + 1);
-            }
-
-            if(node->els){
-                if(node->then && node->then->kind == ND_COMPOUND_STMT){
-                    fputs(" else", out);
-                }else{
-                    write_indent(out, depth);
-                    fputs("else", out);
-                }
-
-                if(node->els->kind == ND_COMPOUND_STMT){
-                    fputs(" {\n", out);
-                    for(Node * cur = node->els->body; cur; cur = cur->next){
-                        format_stmt(cur, out, depth + 1);
-                        if(cur->kind == ND_VAR_DECL){
-                            while(cur->next && cur->next->kind == ND_VAR_DECL &&
-                                  sv_equals(cur->next->type_name, cur->type_name)){
-                                cur = cur->next;
-                            }
-                        }
-                    }
-                    write_indent(out, depth);
-                    fputs("}\n", out);
-                }else if(node->els->kind == ND_IF){
-                    fputc(' ', out);
-                    // else if 同一行且不加额外缩进
-                    format_stmt(node->els, out, depth);
-                }else{
-                    fputc('\n', out);
-                    format_stmt(node->els, out, depth + 1);
-                }
-            }else{
-                if(node->then && node->then->kind == ND_COMPOUND_STMT){
-                    fputc('\n', out);
-                }
-            }
+            format_if(node, out, depth, 1);
             break;
 
         case ND_WHILE:
@@ -293,6 +284,13 @@ static void format_stmt(Node * node, FILE * out, int depth){
                     if(node->init->lhs){
                         fputs(" = ", out);
                         format_expr(node->init->lhs, out);
+                    }
+                    for(Node * sub = node->init->args; sub; sub = sub->next){
+                        fprintf(out, ", %.*s", sv_length(sub->name), sv_begin(sub->name));
+                        if(sub->lhs){
+                            fputs(" = ", out);
+                            format_expr(sub->lhs, out);
+                        }
                     }
                     fputs("; ", out);
                 }else if(node->init->kind == ND_EXPR_STMT){
@@ -408,6 +406,16 @@ static void format_stmt(Node * node, FILE * out, int depth){
             fputs(");\n", out);
             break;
 
+        case ND_COMMENT:
+            write_indent(out, depth);
+            fprintf(out, "%.*s\n", sv_length(node->str_val), sv_begin(node->str_val));
+            break;
+
+        case ND_LABEL:
+            write_indent(out, depth > 0 ? depth - 1 : 0);
+            fprintf(out, "%.*s:\n", sv_length(node->name), sv_begin(node->name));
+            break;
+
         default:
             break;
     }
@@ -420,13 +428,6 @@ void format_ast(Node * root, FILE * out){
     if(root->kind == ND_PROGRAM){
         for(Node * cur = root->body; cur; cur = cur->next){
             format_stmt(cur, out, 0);
-            // 跳过已在 format_stmt 中合并的连续变量声明
-            if(cur->kind == ND_VAR_DECL){
-                while(cur->next && cur->next->kind == ND_VAR_DECL &&
-                      sv_equals(cur->next->type_name, cur->type_name)){
-                    cur = cur->next;
-                }
-            }
         }
     }else{
         format_stmt(root, out, 0);
