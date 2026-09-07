@@ -1,4 +1,5 @@
 #include <formatter/tokenizer.h>
+#include <formatter/map.h>
 #include <stdio.h>
 
 typedef struct {
@@ -22,17 +23,26 @@ typedef struct {
     int success;
 } token_result;
 
+/// 这里是一些不得不全局定义的变量
+hashmap * keywords = NULL;  
+
 char context_peek(parsing_context * context);
 char context_peek_n(parsing_context * context, int n);
 char context_fetch(parsing_context * context);
 char* context_fetch_n(parsing_context * context, int n);
 
+/// 从identifier中提取出关键词
+void build_keywords();
+TokenType try_resolve_keyword(hashmap * keywords, string_view sv);
+
 token_result parse_ident(parsing_context * context);
 token_result parse_single_line_comment(parsing_context * context);
 token_result parse_multiple_lines_comment(parsing_context * context);
+/// 据说十六进制也有科学计数法形式，但是暂时不收录吧，感觉比较赶
 token_result parse_number(parsing_context * context);
 token_result parse_decimal_number(parsing_context * context);
 
+/// 这些是转换数字的"helper"
 static int scan_numeric_segment(parsing_context * context, int begin, int base, unsigned long long * value, int * separator_ok);
 static int scan_decimal(parsing_context * context, int begin, int * is_float, int * separator_ok, long double * value);
 static int scan_number_suffix(parsing_context * context, int begin, int is_float, enum TokenIValType * itype, int * ok);
@@ -47,6 +57,8 @@ static int scan_number_suffix(parsing_context * context, int begin, int is_float
 #define ADD_TOKEN(target,token)  *((Token*)vec_push_back((target))) = (token)
 
 tokenizer_result parse_tokens(string_view sv, vector * vec){
+    build_keywords();
+
     tokenizer_result result = {
         .success = 1,
         .diagnoses = vec_new(sizeof(stage_diagnosis), 8)
@@ -241,6 +253,43 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
     return result;
 }
 
+void build_keywords(){
+    if(keywords) return;
+    keywords = hashmap_create();
+
+    hashmap_set(keywords, hashmap_str_lit("return"), T_KW_RETURN);
+    hashmap_set(keywords, hashmap_str_lit("if"), T_KW_IF);
+    hashmap_set(keywords, hashmap_str_lit("else"), T_KW_ELSE);
+    hashmap_set(keywords, hashmap_str_lit("while"), T_KW_WHILE);
+    hashmap_set(keywords, hashmap_str_lit("do"), T_KW_DO);
+    hashmap_set(keywords, hashmap_str_lit("switch"), T_KW_SWITCH);
+    hashmap_set(keywords, hashmap_str_lit("case"), T_KW_CASE);
+    hashmap_set(keywords, hashmap_str_lit("default"), T_KW_DEFAULT);
+    hashmap_set(keywords, hashmap_str_lit("goto"), T_KW_GOTO);
+    hashmap_set(keywords, hashmap_str_lit("for"), T_KW_FOR);
+}
+
+TokenType try_resolve_keyword(hashmap * kw_map, string_view sv){
+    if(!kw_map){
+        build_keywords();
+        kw_map = keywords;
+    }
+    if(!kw_map) return T_UNKNOWN;
+
+    uintptr_t val = 0;
+    if(hashmap_get(kw_map, sv_begin(sv), sv_length(sv), &val)){
+        return (TokenType)val;
+    }
+    return T_UNKNOWN;
+}
+
+void terminate_tokenizer(){
+    if(keywords){
+        hashmap_free(keywords);
+        keywords = NULL;
+    }
+}
+
 token_result parse_single_line_comment(parsing_context * context){
     {
         GEN_TOKEN(token,T_COMMENT_SINGLE_LINE,2);
@@ -391,7 +440,13 @@ token_result parse_ident(parsing_context * context){
     token.type = T_IDENTIFIER;
     token.data = sv_substr(context->sv,pos_begin,context->index - pos_begin);
 
+    TokenType kw = try_resolve_keyword(keywords, token.data);
+    if(kw != T_UNKNOWN){
+        token.type = kw;
+    }
+
     ADD_TOKEN(context->vec, token);
+    return ret;
 }
 
 /// 扫描一段某进制的连续数字，允许分隔符(')穿插

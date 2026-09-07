@@ -168,6 +168,7 @@ parse_ast_failed:
 parse_tokens_failed:
     vec_delete(&tokens);
     free(file_buffer);
+    terminate_tokenizer();
     file_buffer = NULL;
     return 0;
 }

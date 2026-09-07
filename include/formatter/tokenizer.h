@@ -56,6 +56,8 @@ typedef struct {
 } tokenizer_result;
 
 tokenizer_result parse_tokens(string_view sv, vector * vec);
+void terminate_tokenizer();
+
 
 // 返回未知token
 static inline Token token_null(string_view sv){

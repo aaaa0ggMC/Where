@@ -51,12 +51,24 @@
     X(T_NUMBER_OCT), /* 八进制 */ \
     X(T_NUMBER_BIN), /* 二进制 */ \
     X(T_NUMBER_FLOAT), /* 浮点 */ \
+    X(T_KW_RETURN), /* 返回值 */ \
+    X(T_KW_IF), /*if*/ \
+    X(T_KW_ELSE), /*else*/ \
+    X(T_KW_WHILE), /*while*/ \
+    X(T_KW_DO), /*do*/ \
+    X(T_KW_SWITCH), /*switch*/ \
+    X(T_KW_CASE), /*case*/ \
+    X(T_KW_DEFAULT), /*default*/ \
+    X(T_KW_GOTO), /*goto*/ \
+    X(T_KW_FOR), /*for*/ \
+    X(T_OP_COLON), /*: 用于switch还有tag*/ \
     X(T_UNKNOWN) /* 未知符号，占位 */ 
 
 #define XTOKEN(X) X
 enum TokenType {
     TOKEN_LIST(XTOKEN)
 };
+typedef enum TokenType TokenType;
 #undef XTOKEN
 
 #define XTOKEN(X) #X
