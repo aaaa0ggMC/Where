@@ -127,6 +127,8 @@ const char * node_kind_name(NodeKind kind){
         case ND_PREPROCESS: return "PREPROCESS";
         case ND_COMMENT: return "COMMENT";
         case ND_PROGRAM: return "PROGRAM";
+        case ND_PAREN: return "PAREN";
+        case ND_INIT_LIST: return "INIT_LIST";
     }
     return "?";
 }
@@ -160,9 +162,18 @@ void print_ast(Node * node, int depth){
             printf(" %.*s\n", sv_length(node->name), sv_begin(node->name));
             break;
         case ND_VAR_DECL:
-            printf(" type: %.*s name: %.*s\n", 
+            printf(" type: %.*s name: %.*s", 
                 sv_length(node->type_name), sv_begin(node->type_name),
                 sv_length(node->name), sv_begin(node->name));
+            if(node->is_array) printf(" [array]");
+            printf("\n");
+            if(node->is_array && node->array_dim){
+                print_indent(depth + 1);
+                printf("dims:\n");
+                for(Node * dim = node->array_dim; dim; dim = dim->next){
+                    print_ast(dim, depth + 2);
+                }
+            }
             if(node->lhs){
                 print_indent(depth + 1);
                 printf("init:\n");
@@ -170,9 +181,18 @@ void print_ast(Node * node, int depth){
             }
             for(Node * sub = node->args; sub; sub = sub->next){
                 print_indent(depth);
-                printf("VAR_DECL (multi) type: %.*s name: %.*s\n",
+                printf("VAR_DECL (multi) type: %.*s name: %.*s",
                     sv_length(sub->type_name), sv_begin(sub->type_name),
                     sv_length(sub->name), sv_begin(sub->name));
+                if(sub->is_array) printf(" [array]");
+                printf("\n");
+                if(sub->is_array && sub->array_dim){
+                    print_indent(depth + 1);
+                    printf("dims:\n");
+                    for(Node * dim = sub->array_dim; dim; dim = dim->next){
+                        print_ast(dim, depth + 2);
+                    }
+                }
                 if(sub->lhs){
                     print_indent(depth + 1);
                     printf("init:\n");
@@ -324,6 +344,16 @@ void print_ast(Node * node, int depth){
         case ND_LABEL:
             printf(" %.*s:\n", sv_length(node->name), sv_begin(node->name));
             break;
+        case ND_PAREN:
+            printf("\n");
+            if(node->lhs) print_ast(node->lhs, depth + 1);
+            break;
+        case ND_INIT_LIST:
+            printf("\n");
+            for(Node * cur = node->body; cur; cur = cur->next){
+                print_ast(cur, depth + 1);
+            }
+            break;
         default:
             printf("\n");
             if(node->lhs) print_ast(node->lhs, depth + 1);
@@ -349,6 +379,8 @@ void ast_free(Node * node){
     if(node->inc) ast_free(node->inc);
     if(node->body) ast_free(node->body);
     if(node->args) ast_free(node->args);
+    if(node->array_dim) ast_free(node->array_dim);
+    if(node->leading_comment) ast_free(node->leading_comment);
 
     free(node);
 }

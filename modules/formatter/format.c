@@ -19,6 +19,12 @@ static void format_stmt(Node * node, FILE * out, int depth);
 static void format_expr(Node * node, FILE * out){
     if(!node) return;
 
+    if(node->leading_comment){
+        for(Node * c = node->leading_comment; c; c = c->next){
+            fprintf(out, "%.*s ", sv_length(c->str_val), sv_begin(c->str_val));
+        }
+    }
+
     switch(node->kind){
         case ND_NUM:
             if(node->tok && sv_length(node->tok->data) > 0){
@@ -123,6 +129,21 @@ static void format_expr(Node * node, FILE * out){
             fputc(']', out);
             break;
 
+        case ND_PAREN:
+            fputc('(', out);
+            format_expr(node->lhs, out);
+            fputc(')', out);
+            break;
+
+        case ND_INIT_LIST:
+            fputs("{", out);
+            for(Node * cur = node->body; cur; cur = cur->next){
+                format_expr(cur, out);
+                if(cur->next) fputs(", ", out);
+            }
+            fputs("}", out);
+            break;
+
         default:
             if(node->lhs) format_expr(node->lhs, out);
             if(node->rhs) format_expr(node->rhs, out);
@@ -178,6 +199,54 @@ static void format_if(Node * node, FILE * out, int depth, int indent_first){
     }
 }
 
+static void format_var_declarator(Node * var, FILE * out){
+    if(var->leading_comment){
+        for(Node * c = var->leading_comment; c; c = c->next){
+            fprintf(out, "%.*s ", sv_length(c->str_val), sv_begin(c->str_val));
+        }
+    }
+    if(sv_length(var->name) > 0){
+        fprintf(out, "%.*s", sv_length(var->name), sv_begin(var->name));
+    }
+    if(var->is_array){
+        for(Node * dim = var->array_dim; dim; dim = dim->next){
+            fputc('[', out);
+            if(dim->kind != ND_NULL_EXPR){
+                format_expr(dim, out);
+            }
+            fputc(']', out);
+        }
+    }
+    if(var->lhs){
+        fputs(" = ", out);
+        format_expr(var->lhs, out);
+    }
+}
+
+static void format_param(Node * p, FILE * out){
+    fprintf(out, "%.*s", sv_length(p->type_name), sv_begin(p->type_name));
+    if(p->leading_comment){
+        fputc(' ', out);
+        for(Node * c = p->leading_comment; c; c = c->next){
+            fprintf(out, "%.*s ", sv_length(c->str_val), sv_begin(c->str_val));
+        }
+    }else if(sv_length(p->name) > 0){
+        fputc(' ', out);
+    }
+    if(sv_length(p->name) > 0){
+        fprintf(out, "%.*s", sv_length(p->name), sv_begin(p->name));
+    }
+    if(p->is_array){
+        for(Node * dim = p->array_dim; dim; dim = dim->next){
+            fputc('[', out);
+            if(dim->kind != ND_NULL_EXPR){
+                format_expr(dim, out);
+            }
+            fputc(']', out);
+        }
+    }
+}
+
 /// 语句格式化
 static void format_stmt(Node * node, FILE * out, int depth){
     if(!node) return;
@@ -199,18 +268,11 @@ static void format_stmt(Node * node, FILE * out, int depth){
 
         case ND_VAR_DECL:
             write_indent(out, depth);
-            fprintf(out, "%.*s %.*s", sv_length(node->type_name), sv_begin(node->type_name),
-                    sv_length(node->name), sv_begin(node->name));
-            if(node->lhs){
-                fputs(" = ", out);
-                format_expr(node->lhs, out);
-            }
+            fprintf(out, "%.*s ", sv_length(node->type_name), sv_begin(node->type_name));
+            format_var_declarator(node, out);
             for(Node * sub = node->args; sub; sub = sub->next){
-                fprintf(out, ", %.*s", sv_length(sub->name), sv_begin(sub->name));
-                if(sub->lhs){
-                    fputs(" = ", out);
-                    format_expr(sub->lhs, out);
-                }
+                fputs(", ", out);
+                format_var_declarator(sub, out);
             }
             fputs(";\n", out);
             break;
@@ -279,18 +341,11 @@ static void format_stmt(Node * node, FILE * out, int depth){
             fputs("for (", out);
             if(node->init){
                 if(node->init->kind == ND_VAR_DECL){
-                    fprintf(out, "%.*s %.*s", sv_length(node->init->type_name), sv_begin(node->init->type_name),
-                            sv_length(node->init->name), sv_begin(node->init->name));
-                    if(node->init->lhs){
-                        fputs(" = ", out);
-                        format_expr(node->init->lhs, out);
-                    }
+                    fprintf(out, "%.*s ", sv_length(node->init->type_name), sv_begin(node->init->type_name));
+                    format_var_declarator(node->init, out);
                     for(Node * sub = node->init->args; sub; sub = sub->next){
-                        fprintf(out, ", %.*s", sv_length(sub->name), sv_begin(sub->name));
-                        if(sub->lhs){
-                            fputs(" = ", out);
-                            format_expr(sub->lhs, out);
-                        }
+                        fputs(", ", out);
+                        format_var_declarator(sub, out);
                     }
                     fputs("; ", out);
                 }else if(node->init->kind == ND_EXPR_STMT){
@@ -386,8 +441,7 @@ static void format_stmt(Node * node, FILE * out, int depth){
             fprintf(out, "%.*s %.*s(", sv_length(node->type_name), sv_begin(node->type_name),
                     sv_length(node->name), sv_begin(node->name));
             for(Node * p = node->args; p; p = p->next){
-                fprintf(out, "%.*s %.*s", sv_length(p->type_name), sv_begin(p->type_name),
-                        sv_length(p->name), sv_begin(p->name));
+                format_param(p, out);
                 if(p->next) fputs(", ", out);
             }
             fputs(")\n", out);
@@ -399,8 +453,7 @@ static void format_stmt(Node * node, FILE * out, int depth){
             fprintf(out, "%.*s %.*s(", sv_length(node->type_name), sv_begin(node->type_name),
                     sv_length(node->name), sv_begin(node->name));
             for(Node * p = node->args; p; p = p->next){
-                fprintf(out, "%.*s %.*s", sv_length(p->type_name), sv_begin(p->type_name),
-                        sv_length(p->name), sv_begin(p->name));
+                format_param(p, out);
                 if(p->next) fputs(", ", out);
             }
             fputs(");\n", out);

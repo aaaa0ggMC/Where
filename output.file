@@ -1,0 +1,1030 @@
+Got in="demo.c" out="/tmp/output_test.c" 
+Read input:
+```c
+/**
+ * @file demo.c
+ * @author aaaa0ggmc (lovelinux@yslwd.eu.org)
+ * @brief 简单演示文件
+ * @version 5.0
+ * @date 2026-09-07
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
+
+/// 预处理指令 ，保持0缩进
+#include <stdio.h>
+#define MAX_BUFFER 1024
+#define PI 3.14159f
+#define ENABLE_FEATURE 1
+#undef OBSOLETE_FLAG
+
+/// 全局变量声明与多变量合并
+/// int, float, double, char, void, long
+int g_counter = 0, g_status = 1;
+int g_buffer[64];
+float g_ratio = 1.0f, g_scale = 0.1e2;
+double g_epsilon = 1.5e-4;
+char g_tag = 'V';
+long g_large = 100000;
+
+/// 函数声明
+int calculate_sum(int a, int b);
+int sum_array(int arr[], int size);
+void log_message(int code, float val);
+
+/// 函数定义
+int process_algorithm(int base, float factor){
+    int dec_num = 42; // 十进制整数
+    int hex_num = 0x2A; // 十六进制整数
+    int oct_num = 052; // 八进制整数
+    int bin_num = 0b101010; // 二进制整数
+    float float_val = 3.14f; // 浮点数带单精度后缀
+    double sci_val = 0.25e3; // 科学计数法浮点数
+    char ch = 'A'; // 字符常量
+    char newline = '\n'; // 转义字符常量
+
+    /// 表达式与运算符优先级层级
+    // 算术运算: +, -, *, /, %
+    int math_res = (dec_num + hex_num * 2) / (oct_num % 10);
+
+    // 位运算: &, ^, |, ~
+    int bit_res = (dec_num & 0xFF) | (~bin_num ^ 1);
+
+    // 关系与判等运算: <, <=, >, >=, ==, !=
+    // 逻辑运算: &&, ||, !
+    int logic_res = !(base < 0) && (factor >= 1.0f || base == 42) && (hex_num != oct_num);
+
+    // 前置与后置自增自减: ++, --
+    ++base;
+    base++;
+    --dec_num;
+    dec_num--;
+
+    // 数组声明、下标运算与函数调用
+    int arr_data[5] = {10, 20, 30, 40, 50};
+    int item = arr_data[0];
+    int call_res = calculate_sum(base, math_res);
+
+    // 条件语句
+    if(base > 100){
+        base = base - 10;
+    }else if(base == 100){
+        base = 0;
+    }else{
+        base = base + 10;
+    }
+
+    // while循环与break
+    while(math_res > 0){
+        math_res--;
+        if(math_res == 5){
+            break;
+        }
+    }
+
+    // do-while循环与continue
+    do{
+        base = base + 1;
+        if(base % 2 == 0){
+            continue;
+        }
+    }while(base < 20);
+
+    // for循环
+    for(int idx = 0; idx < 10; ++idx){
+        dec_num = dec_num + idx;
+    }
+
+    // switch控制流
+    switch(dec_num){
+        case 1:
+            base = base + 1;
+            break;
+        case 2: {
+            base = base + 2;
+            break;
+        }
+        default: {
+            base = 0;
+            break;
+        }
+    }
+
+    // 多层嵌套代码块与局部预处理指令
+    {
+        int level1 = 10;
+        {
+            // 这个依据我的习惯(或者说是我以前看过的标准上这么说的，建议预处理指令0缩进)
+            #define INNER_THRESHOLD 64
+            int level2 = 20;
+            if(level2 > INNER_THRESHOLD){
+                level2 = INNER_THRESHOLD;
+            }
+        }
+    }
+
+    // goto语句与标签定义
+    goto skip_step;
+    base = base + 999;
+skip_step:
+
+    // return语句
+    return base + dec_num;
+}
+
+// void返回类型函数定义与空return
+void log_message(int code, float val){
+    printf("Code: %d, Value: %f\n", code, val);
+    return;
+}
+
+```
+type=T_BEGIN_COMMENT_MULTIPLE_LINES data="/*" loc=(0,0)
+type=T_COMMENT_BODY         data="*\n * @file demo.c\n * @author aaaa0ggmc (lovelinux@yslwd.eu.org)\n * @brief 简单演示文件\n * @version 5.0\n * @date 2026-09-07\n * \n * @copyright Copyright (c) 2026\n * \n " loc=(0,2)
+type=T_END_COMMENT_MULTIPLE_LINES data="*/" loc=(9,1)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(11,0)
+type=T_COMMENT_BODY         data="/ 预处理指令 ，保持0缩进" loc=(11,2)
+type=T_PP_INCLUDE           data="#include" loc=(12,8)
+type=T_HEADER_NAME          data="<stdio.h>" loc=(12,18)
+type=T_PP_DEFINE            data="#define" loc=(13,7)
+type=T_IDENTIFIER           data="MAX_BUFFER" loc=(13,8)
+type=T_NUMBER               data="1024" itype=I_INT          ival=1024 loc=(13,19)
+type=T_PP_DEFINE            data="#define" loc=(14,7)
+type=T_IDENTIFIER           data="PI" loc=(14,8)
+type=T_NUMBER_FLOAT         data="3.14159f" itype=I_FLOAT        ival=3.14159 loc=(14,11)
+type=T_PP_DEFINE            data="#define" loc=(15,7)
+type=T_IDENTIFIER           data="ENABLE_FEATURE" loc=(15,8)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(15,23)
+type=T_PP_UNDEF             data="#undef" loc=(16,6)
+type=T_IDENTIFIER           data="OBSOLETE_FLAG" loc=(16,7)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(18,0)
+type=T_COMMENT_BODY         data="/ 全局变量声明与多变量合并" loc=(18,2)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(19,0)
+type=T_COMMENT_BODY         data="/ int, float, double, char, void, long" loc=(19,2)
+type=T_IDENTIFIER           data="int" loc=(20,0)
+type=T_IDENTIFIER           data="g_counter" loc=(20,4)
+type=T_OP_ASSIGN            data="=" loc=(20,14)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(20,16)
+type=T_COMMA                data="," loc=(20,17)
+type=T_IDENTIFIER           data="g_status" loc=(20,19)
+type=T_OP_ASSIGN            data="=" loc=(20,28)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(20,30)
+type=T_END_STATEMENT        data=";" loc=(20,31)
+type=T_IDENTIFIER           data="int" loc=(21,0)
+type=T_IDENTIFIER           data="g_buffer" loc=(21,4)
+type=T_BRACKET_BEGIN        data="[" loc=(21,12)
+type=T_NUMBER               data="64" itype=I_INT          ival=64 loc=(21,13)
+type=T_BRACKET_END          data="]" loc=(21,15)
+type=T_END_STATEMENT        data=";" loc=(21,16)
+type=T_IDENTIFIER           data="float" loc=(22,0)
+type=T_IDENTIFIER           data="g_ratio" loc=(22,6)
+type=T_OP_ASSIGN            data="=" loc=(22,14)
+type=T_NUMBER_FLOAT         data="1.0f" itype=I_FLOAT        ival=1 loc=(22,16)
+type=T_COMMA                data="," loc=(22,20)
+type=T_IDENTIFIER           data="g_scale" loc=(22,22)
+type=T_OP_ASSIGN            data="=" loc=(22,30)
+type=T_NUMBER_FLOAT         data="0.1e2" itype=I_DOUBLE       ival=10 loc=(22,32)
+type=T_END_STATEMENT        data=";" loc=(22,37)
+type=T_IDENTIFIER           data="double" loc=(23,0)
+type=T_IDENTIFIER           data="g_epsilon" loc=(23,7)
+type=T_OP_ASSIGN            data="=" loc=(23,17)
+type=T_NUMBER_FLOAT         data="1.5e-4" itype=I_DOUBLE       ival=0.00015 loc=(23,19)
+type=T_END_STATEMENT        data=";" loc=(23,25)
+type=T_IDENTIFIER           data="char" loc=(24,0)
+type=T_IDENTIFIER           data="g_tag" loc=(24,5)
+type=T_OP_ASSIGN            data="=" loc=(24,11)
+type=T_CHAR_LITERAL         data="'V'" loc=(24,16)
+type=T_END_STATEMENT        data=";" loc=(24,16)
+type=T_IDENTIFIER           data="long" loc=(25,0)
+type=T_IDENTIFIER           data="g_large" loc=(25,5)
+type=T_OP_ASSIGN            data="=" loc=(25,13)
+type=T_NUMBER               data="100000" itype=I_INT          ival=100000 loc=(25,15)
+type=T_END_STATEMENT        data=";" loc=(25,21)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(27,0)
+type=T_COMMENT_BODY         data="/ 函数声明" loc=(27,2)
+type=T_IDENTIFIER           data="int" loc=(28,0)
+type=T_IDENTIFIER           data="calculate_sum" loc=(28,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(28,17)
+type=T_IDENTIFIER           data="int" loc=(28,18)
+type=T_IDENTIFIER           data="a" loc=(28,22)
+type=T_COMMA                data="," loc=(28,23)
+type=T_IDENTIFIER           data="int" loc=(28,25)
+type=T_IDENTIFIER           data="b" loc=(28,29)
+type=T_PARENTHESE_END       data=")" loc=(28,30)
+type=T_END_STATEMENT        data=";" loc=(28,31)
+type=T_IDENTIFIER           data="int" loc=(29,0)
+type=T_IDENTIFIER           data="sum_array" loc=(29,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(29,13)
+type=T_IDENTIFIER           data="int" loc=(29,14)
+type=T_IDENTIFIER           data="arr" loc=(29,18)
+type=T_BRACKET_BEGIN        data="[" loc=(29,21)
+type=T_BRACKET_END          data="]" loc=(29,22)
+type=T_COMMA                data="," loc=(29,23)
+type=T_IDENTIFIER           data="int" loc=(29,25)
+type=T_IDENTIFIER           data="size" loc=(29,29)
+type=T_PARENTHESE_END       data=")" loc=(29,33)
+type=T_END_STATEMENT        data=";" loc=(29,34)
+type=T_IDENTIFIER           data="void" loc=(30,0)
+type=T_IDENTIFIER           data="log_message" loc=(30,5)
+type=T_PARENTHESE_BEGIN     data="(" loc=(30,16)
+type=T_IDENTIFIER           data="int" loc=(30,17)
+type=T_IDENTIFIER           data="code" loc=(30,21)
+type=T_COMMA                data="," loc=(30,25)
+type=T_IDENTIFIER           data="float" loc=(30,27)
+type=T_IDENTIFIER           data="val" loc=(30,33)
+type=T_PARENTHESE_END       data=")" loc=(30,36)
+type=T_END_STATEMENT        data=";" loc=(30,37)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(32,0)
+type=T_COMMENT_BODY         data="/ 函数定义" loc=(32,2)
+type=T_IDENTIFIER           data="int" loc=(33,0)
+type=T_IDENTIFIER           data="process_algorithm" loc=(33,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(33,21)
+type=T_IDENTIFIER           data="int" loc=(33,22)
+type=T_IDENTIFIER           data="base" loc=(33,26)
+type=T_COMMA                data="," loc=(33,30)
+type=T_IDENTIFIER           data="float" loc=(33,32)
+type=T_IDENTIFIER           data="factor" loc=(33,38)
+type=T_PARENTHESE_END       data=")" loc=(33,44)
+type=T_BRACE_BEGIN          data="{" loc=(33,45)
+type=T_IDENTIFIER           data="int" loc=(34,4)
+type=T_IDENTIFIER           data="dec_num" loc=(34,8)
+type=T_OP_ASSIGN            data="=" loc=(34,16)
+type=T_NUMBER               data="42" itype=I_INT          ival=42 loc=(34,18)
+type=T_END_STATEMENT        data=";" loc=(34,20)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(34,22)
+type=T_COMMENT_BODY         data=" 十进制整数" loc=(34,24)
+type=T_IDENTIFIER           data="int" loc=(35,4)
+type=T_IDENTIFIER           data="hex_num" loc=(35,8)
+type=T_OP_ASSIGN            data="=" loc=(35,16)
+type=T_NUMBER_HEX           data="0x2A" itype=I_INT          ival=42 loc=(35,18)
+type=T_END_STATEMENT        data=";" loc=(35,22)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(35,24)
+type=T_COMMENT_BODY         data=" 十六进制整数" loc=(35,26)
+type=T_IDENTIFIER           data="int" loc=(36,4)
+type=T_IDENTIFIER           data="oct_num" loc=(36,8)
+type=T_OP_ASSIGN            data="=" loc=(36,16)
+type=T_NUMBER_OCT           data="052" itype=I_INT          ival=42 loc=(36,18)
+type=T_END_STATEMENT        data=";" loc=(36,21)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(36,23)
+type=T_COMMENT_BODY         data=" 八进制整数" loc=(36,25)
+type=T_IDENTIFIER           data="int" loc=(37,4)
+type=T_IDENTIFIER           data="bin_num" loc=(37,8)
+type=T_OP_ASSIGN            data="=" loc=(37,16)
+type=T_NUMBER_BIN           data="0b101010" itype=I_INT          ival=42 loc=(37,18)
+type=T_END_STATEMENT        data=";" loc=(37,26)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(37,28)
+type=T_COMMENT_BODY         data=" 二进制整数" loc=(37,30)
+type=T_IDENTIFIER           data="float" loc=(38,4)
+type=T_IDENTIFIER           data="float_val" loc=(38,10)
+type=T_OP_ASSIGN            data="=" loc=(38,20)
+type=T_NUMBER_FLOAT         data="3.14f" itype=I_FLOAT        ival=3.14 loc=(38,22)
+type=T_END_STATEMENT        data=";" loc=(38,27)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(38,29)
+type=T_COMMENT_BODY         data=" 浮点数带单精度后缀" loc=(38,31)
+type=T_IDENTIFIER           data="double" loc=(39,4)
+type=T_IDENTIFIER           data="sci_val" loc=(39,11)
+type=T_OP_ASSIGN            data="=" loc=(39,19)
+type=T_NUMBER_FLOAT         data="0.25e3" itype=I_DOUBLE       ival=250 loc=(39,21)
+type=T_END_STATEMENT        data=";" loc=(39,27)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(39,29)
+type=T_COMMENT_BODY         data=" 科学计数法浮点数" loc=(39,31)
+type=T_IDENTIFIER           data="char" loc=(40,4)
+type=T_IDENTIFIER           data="ch" loc=(40,9)
+type=T_OP_ASSIGN            data="=" loc=(40,12)
+type=T_CHAR_LITERAL         data="'A'" loc=(40,17)
+type=T_END_STATEMENT        data=";" loc=(40,17)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(40,19)
+type=T_COMMENT_BODY         data=" 字符常量" loc=(40,21)
+type=T_IDENTIFIER           data="char" loc=(41,4)
+type=T_IDENTIFIER           data="newline" loc=(41,9)
+type=T_OP_ASSIGN            data="=" loc=(41,17)
+type=T_CHAR_LITERAL         data="'\n'" loc=(41,23)
+type=T_END_STATEMENT        data=";" loc=(41,23)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(41,25)
+type=T_COMMENT_BODY         data=" 转义字符常量" loc=(41,27)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(43,4)
+type=T_COMMENT_BODY         data="/ 表达式与运算符优先级层级" loc=(43,6)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(44,4)
+type=T_COMMENT_BODY         data=" 算术运算: +, -, *, /, %" loc=(44,6)
+type=T_IDENTIFIER           data="int" loc=(45,4)
+type=T_IDENTIFIER           data="math_res" loc=(45,8)
+type=T_OP_ASSIGN            data="=" loc=(45,17)
+type=T_PARENTHESE_BEGIN     data="(" loc=(45,19)
+type=T_IDENTIFIER           data="dec_num" loc=(45,20)
+type=T_OP_ADD               data="+" loc=(45,28)
+type=T_IDENTIFIER           data="hex_num" loc=(45,30)
+type=T_OP_MUL               data="*" loc=(45,38)
+type=T_NUMBER               data="2" itype=I_INT          ival=2 loc=(45,40)
+type=T_PARENTHESE_END       data=")" loc=(45,41)
+type=T_OP_DIV               data="/" loc=(45,43)
+type=T_PARENTHESE_BEGIN     data="(" loc=(45,45)
+type=T_IDENTIFIER           data="oct_num" loc=(45,46)
+type=T_OP_MOD               data="%" loc=(45,54)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(45,56)
+type=T_PARENTHESE_END       data=")" loc=(45,58)
+type=T_END_STATEMENT        data=";" loc=(45,59)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(47,4)
+type=T_COMMENT_BODY         data=" 位运算: &, ^, |, ~" loc=(47,6)
+type=T_IDENTIFIER           data="int" loc=(48,4)
+type=T_IDENTIFIER           data="bit_res" loc=(48,8)
+type=T_OP_ASSIGN            data="=" loc=(48,16)
+type=T_PARENTHESE_BEGIN     data="(" loc=(48,18)
+type=T_IDENTIFIER           data="dec_num" loc=(48,19)
+type=T_OP_BIT_AND           data="&" loc=(48,27)
+type=T_NUMBER_HEX           data="0xFF" itype=I_INT          ival=255 loc=(48,29)
+type=T_PARENTHESE_END       data=")" loc=(48,33)
+type=T_OP_BIT_OR            data="|" loc=(48,35)
+type=T_PARENTHESE_BEGIN     data="(" loc=(48,37)
+type=T_OP_BIT_NOT           data="~" loc=(48,38)
+type=T_IDENTIFIER           data="bin_num" loc=(48,39)
+type=T_OP_BIT_XOR           data="^" loc=(48,47)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(48,49)
+type=T_PARENTHESE_END       data=")" loc=(48,50)
+type=T_END_STATEMENT        data=";" loc=(48,51)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(50,4)
+type=T_COMMENT_BODY         data=" 关系与判等运算: <, <=, >, >=, ==, !=" loc=(50,6)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(51,4)
+type=T_COMMENT_BODY         data=" 逻辑运算: &&, ||, !" loc=(51,6)
+type=T_IDENTIFIER           data="int" loc=(52,4)
+type=T_IDENTIFIER           data="logic_res" loc=(52,8)
+type=T_OP_ASSIGN            data="=" loc=(52,18)
+type=T_OP_NOT               data="!" loc=(52,20)
+type=T_PARENTHESE_BEGIN     data="(" loc=(52,21)
+type=T_IDENTIFIER           data="base" loc=(52,22)
+type=T_OP_LT                data="<" loc=(52,27)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(52,29)
+type=T_PARENTHESE_END       data=")" loc=(52,30)
+type=T_OP_LOGICAL_AND       data="&&" loc=(52,32)
+type=T_PARENTHESE_BEGIN     data="(" loc=(52,35)
+type=T_IDENTIFIER           data="factor" loc=(52,36)
+type=T_OP_GE                data=">=" loc=(52,43)
+type=T_NUMBER_FLOAT         data="1.0f" itype=I_FLOAT        ival=1 loc=(52,46)
+type=T_OP_LOGICAL_OR        data="||" loc=(52,51)
+type=T_IDENTIFIER           data="base" loc=(52,54)
+type=T_OP_EQ                data="==" loc=(52,59)
+type=T_NUMBER               data="42" itype=I_INT          ival=42 loc=(52,62)
+type=T_PARENTHESE_END       data=")" loc=(52,64)
+type=T_OP_LOGICAL_AND       data="&&" loc=(52,66)
+type=T_PARENTHESE_BEGIN     data="(" loc=(52,69)
+type=T_IDENTIFIER           data="hex_num" loc=(52,70)
+type=T_OP_NE                data="!=" loc=(52,78)
+type=T_IDENTIFIER           data="oct_num" loc=(52,81)
+type=T_PARENTHESE_END       data=")" loc=(52,88)
+type=T_END_STATEMENT        data=";" loc=(52,89)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(54,4)
+type=T_COMMENT_BODY         data=" 前置与后置自增自减: ++, --" loc=(54,6)
+type=T_OP_INCREMENT         data="++" loc=(55,4)
+type=T_IDENTIFIER           data="base" loc=(55,6)
+type=T_END_STATEMENT        data=";" loc=(55,10)
+type=T_IDENTIFIER           data="base" loc=(56,4)
+type=T_OP_INCREMENT         data="++" loc=(56,8)
+type=T_END_STATEMENT        data=";" loc=(56,10)
+type=T_OP_DECREMENT         data="--" loc=(57,4)
+type=T_IDENTIFIER           data="dec_num" loc=(57,6)
+type=T_END_STATEMENT        data=";" loc=(57,13)
+type=T_IDENTIFIER           data="dec_num" loc=(58,4)
+type=T_OP_DECREMENT         data="--" loc=(58,11)
+type=T_END_STATEMENT        data=";" loc=(58,13)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(60,4)
+type=T_COMMENT_BODY         data=" 数组声明、下标运算与函数调用" loc=(60,6)
+type=T_IDENTIFIER           data="int" loc=(61,4)
+type=T_IDENTIFIER           data="arr_data" loc=(61,8)
+type=T_BRACKET_BEGIN        data="[" loc=(61,16)
+type=T_NUMBER               data="5" itype=I_INT          ival=5 loc=(61,17)
+type=T_BRACKET_END          data="]" loc=(61,18)
+type=T_OP_ASSIGN            data="=" loc=(61,20)
+type=T_BRACE_BEGIN          data="{" loc=(61,22)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(61,23)
+type=T_COMMA                data="," loc=(61,25)
+type=T_NUMBER               data="20" itype=I_INT          ival=20 loc=(61,27)
+type=T_COMMA                data="," loc=(61,29)
+type=T_NUMBER               data="30" itype=I_INT          ival=30 loc=(61,31)
+type=T_COMMA                data="," loc=(61,33)
+type=T_NUMBER               data="40" itype=I_INT          ival=40 loc=(61,35)
+type=T_COMMA                data="," loc=(61,37)
+type=T_NUMBER               data="50" itype=I_INT          ival=50 loc=(61,39)
+type=T_BRACE_END            data="}" loc=(61,41)
+type=T_END_STATEMENT        data=";" loc=(61,42)
+type=T_IDENTIFIER           data="int" loc=(62,4)
+type=T_IDENTIFIER           data="item" loc=(62,8)
+type=T_OP_ASSIGN            data="=" loc=(62,13)
+type=T_IDENTIFIER           data="arr_data" loc=(62,15)
+type=T_BRACKET_BEGIN        data="[" loc=(62,23)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(62,24)
+type=T_BRACKET_END          data="]" loc=(62,25)
+type=T_END_STATEMENT        data=";" loc=(62,26)
+type=T_IDENTIFIER           data="int" loc=(63,4)
+type=T_IDENTIFIER           data="call_res" loc=(63,8)
+type=T_OP_ASSIGN            data="=" loc=(63,17)
+type=T_IDENTIFIER           data="calculate_sum" loc=(63,19)
+type=T_PARENTHESE_BEGIN     data="(" loc=(63,32)
+type=T_IDENTIFIER           data="base" loc=(63,33)
+type=T_COMMA                data="," loc=(63,37)
+type=T_IDENTIFIER           data="math_res" loc=(63,39)
+type=T_PARENTHESE_END       data=")" loc=(63,47)
+type=T_END_STATEMENT        data=";" loc=(63,48)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(65,4)
+type=T_COMMENT_BODY         data=" 条件语句" loc=(65,6)
+type=T_KW_IF                data="if" loc=(66,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(66,6)
+type=T_IDENTIFIER           data="base" loc=(66,7)
+type=T_OP_GT                data=">" loc=(66,12)
+type=T_NUMBER               data="100" itype=I_INT          ival=100 loc=(66,14)
+type=T_PARENTHESE_END       data=")" loc=(66,17)
+type=T_BRACE_BEGIN          data="{" loc=(66,18)
+type=T_IDENTIFIER           data="base" loc=(67,8)
+type=T_OP_ASSIGN            data="=" loc=(67,13)
+type=T_IDENTIFIER           data="base" loc=(67,15)
+type=T_OP_MINUS             data="-" loc=(67,20)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(67,22)
+type=T_END_STATEMENT        data=";" loc=(67,24)
+type=T_BRACE_END            data="}" loc=(68,4)
+type=T_KW_ELSE              data="else" loc=(68,5)
+type=T_KW_IF                data="if" loc=(68,10)
+type=T_PARENTHESE_BEGIN     data="(" loc=(68,12)
+type=T_IDENTIFIER           data="base" loc=(68,13)
+type=T_OP_EQ                data="==" loc=(68,18)
+type=T_NUMBER               data="100" itype=I_INT          ival=100 loc=(68,21)
+type=T_PARENTHESE_END       data=")" loc=(68,24)
+type=T_BRACE_BEGIN          data="{" loc=(68,25)
+type=T_IDENTIFIER           data="base" loc=(69,8)
+type=T_OP_ASSIGN            data="=" loc=(69,13)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(69,15)
+type=T_END_STATEMENT        data=";" loc=(69,16)
+type=T_BRACE_END            data="}" loc=(70,4)
+type=T_KW_ELSE              data="else" loc=(70,5)
+type=T_BRACE_BEGIN          data="{" loc=(70,9)
+type=T_IDENTIFIER           data="base" loc=(71,8)
+type=T_OP_ASSIGN            data="=" loc=(71,13)
+type=T_IDENTIFIER           data="base" loc=(71,15)
+type=T_OP_ADD               data="+" loc=(71,20)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(71,22)
+type=T_END_STATEMENT        data=";" loc=(71,24)
+type=T_BRACE_END            data="}" loc=(72,4)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(74,4)
+type=T_COMMENT_BODY         data=" while循环与break" loc=(74,6)
+type=T_KW_WHILE             data="while" loc=(75,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(75,9)
+type=T_IDENTIFIER           data="math_res" loc=(75,10)
+type=T_OP_GT                data=">" loc=(75,19)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(75,21)
+type=T_PARENTHESE_END       data=")" loc=(75,22)
+type=T_BRACE_BEGIN          data="{" loc=(75,23)
+type=T_IDENTIFIER           data="math_res" loc=(76,8)
+type=T_OP_DECREMENT         data="--" loc=(76,16)
+type=T_END_STATEMENT        data=";" loc=(76,18)
+type=T_KW_IF                data="if" loc=(77,8)
+type=T_PARENTHESE_BEGIN     data="(" loc=(77,10)
+type=T_IDENTIFIER           data="math_res" loc=(77,11)
+type=T_OP_EQ                data="==" loc=(77,20)
+type=T_NUMBER               data="5" itype=I_INT          ival=5 loc=(77,23)
+type=T_PARENTHESE_END       data=")" loc=(77,24)
+type=T_BRACE_BEGIN          data="{" loc=(77,25)
+type=T_KW_BREAK             data="break" loc=(78,12)
+type=T_END_STATEMENT        data=";" loc=(78,17)
+type=T_BRACE_END            data="}" loc=(79,8)
+type=T_BRACE_END            data="}" loc=(80,4)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(82,4)
+type=T_COMMENT_BODY         data=" do-while循环与continue" loc=(82,6)
+type=T_KW_DO                data="do" loc=(83,4)
+type=T_BRACE_BEGIN          data="{" loc=(83,6)
+type=T_IDENTIFIER           data="base" loc=(84,8)
+type=T_OP_ASSIGN            data="=" loc=(84,13)
+type=T_IDENTIFIER           data="base" loc=(84,15)
+type=T_OP_ADD               data="+" loc=(84,20)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(84,22)
+type=T_END_STATEMENT        data=";" loc=(84,23)
+type=T_KW_IF                data="if" loc=(85,8)
+type=T_PARENTHESE_BEGIN     data="(" loc=(85,10)
+type=T_IDENTIFIER           data="base" loc=(85,11)
+type=T_OP_MOD               data="%" loc=(85,16)
+type=T_NUMBER               data="2" itype=I_INT          ival=2 loc=(85,18)
+type=T_OP_EQ                data="==" loc=(85,20)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(85,23)
+type=T_PARENTHESE_END       data=")" loc=(85,24)
+type=T_BRACE_BEGIN          data="{" loc=(85,25)
+type=T_KW_CONTINUE          data="continue" loc=(86,12)
+type=T_END_STATEMENT        data=";" loc=(86,20)
+type=T_BRACE_END            data="}" loc=(87,8)
+type=T_BRACE_END            data="}" loc=(88,4)
+type=T_KW_WHILE             data="while" loc=(88,5)
+type=T_PARENTHESE_BEGIN     data="(" loc=(88,10)
+type=T_IDENTIFIER           data="base" loc=(88,11)
+type=T_OP_LT                data="<" loc=(88,16)
+type=T_NUMBER               data="20" itype=I_INT          ival=20 loc=(88,18)
+type=T_PARENTHESE_END       data=")" loc=(88,20)
+type=T_END_STATEMENT        data=";" loc=(88,21)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(90,4)
+type=T_COMMENT_BODY         data=" for循环" loc=(90,6)
+type=T_KW_FOR               data="for" loc=(91,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(91,7)
+type=T_IDENTIFIER           data="int" loc=(91,8)
+type=T_IDENTIFIER           data="idx" loc=(91,12)
+type=T_OP_ASSIGN            data="=" loc=(91,16)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(91,18)
+type=T_END_STATEMENT        data=";" loc=(91,19)
+type=T_IDENTIFIER           data="idx" loc=(91,21)
+type=T_OP_LT                data="<" loc=(91,25)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(91,27)
+type=T_END_STATEMENT        data=";" loc=(91,29)
+type=T_OP_INCREMENT         data="++" loc=(91,31)
+type=T_IDENTIFIER           data="idx" loc=(91,33)
+type=T_PARENTHESE_END       data=")" loc=(91,36)
+type=T_BRACE_BEGIN          data="{" loc=(91,37)
+type=T_IDENTIFIER           data="dec_num" loc=(92,8)
+type=T_OP_ASSIGN            data="=" loc=(92,16)
+type=T_IDENTIFIER           data="dec_num" loc=(92,18)
+type=T_OP_ADD               data="+" loc=(92,26)
+type=T_IDENTIFIER           data="idx" loc=(92,28)
+type=T_END_STATEMENT        data=";" loc=(92,31)
+type=T_BRACE_END            data="}" loc=(93,4)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(95,4)
+type=T_COMMENT_BODY         data=" switch控制流" loc=(95,6)
+type=T_KW_SWITCH            data="switch" loc=(96,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(96,10)
+type=T_IDENTIFIER           data="dec_num" loc=(96,11)
+type=T_PARENTHESE_END       data=")" loc=(96,18)
+type=T_BRACE_BEGIN          data="{" loc=(96,19)
+type=T_KW_CASE              data="case" loc=(97,8)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(97,13)
+type=T_OP_COLON             data=":" loc=(97,14)
+type=T_IDENTIFIER           data="base" loc=(98,12)
+type=T_OP_ASSIGN            data="=" loc=(98,17)
+type=T_IDENTIFIER           data="base" loc=(98,19)
+type=T_OP_ADD               data="+" loc=(98,24)
+type=T_NUMBER               data="1" itype=I_INT          ival=1 loc=(98,26)
+type=T_END_STATEMENT        data=";" loc=(98,27)
+type=T_KW_BREAK             data="break" loc=(99,12)
+type=T_END_STATEMENT        data=";" loc=(99,17)
+type=T_KW_CASE              data="case" loc=(100,8)
+type=T_NUMBER               data="2" itype=I_INT          ival=2 loc=(100,13)
+type=T_OP_COLON             data=":" loc=(100,14)
+type=T_BRACE_BEGIN          data="{" loc=(100,16)
+type=T_IDENTIFIER           data="base" loc=(101,12)
+type=T_OP_ASSIGN            data="=" loc=(101,17)
+type=T_IDENTIFIER           data="base" loc=(101,19)
+type=T_OP_ADD               data="+" loc=(101,24)
+type=T_NUMBER               data="2" itype=I_INT          ival=2 loc=(101,26)
+type=T_END_STATEMENT        data=";" loc=(101,27)
+type=T_KW_BREAK             data="break" loc=(102,12)
+type=T_END_STATEMENT        data=";" loc=(102,17)
+type=T_BRACE_END            data="}" loc=(103,8)
+type=T_KW_DEFAULT           data="default" loc=(104,8)
+type=T_OP_COLON             data=":" loc=(104,15)
+type=T_BRACE_BEGIN          data="{" loc=(104,17)
+type=T_IDENTIFIER           data="base" loc=(105,12)
+type=T_OP_ASSIGN            data="=" loc=(105,17)
+type=T_NUMBER               data="0" itype=I_INT          ival=0 loc=(105,19)
+type=T_END_STATEMENT        data=";" loc=(105,20)
+type=T_KW_BREAK             data="break" loc=(106,12)
+type=T_END_STATEMENT        data=";" loc=(106,17)
+type=T_BRACE_END            data="}" loc=(107,8)
+type=T_BRACE_END            data="}" loc=(108,4)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(110,4)
+type=T_COMMENT_BODY         data=" 多层嵌套代码块与局部预处理指令" loc=(110,6)
+type=T_BRACE_BEGIN          data="{" loc=(111,4)
+type=T_IDENTIFIER           data="int" loc=(112,8)
+type=T_IDENTIFIER           data="level1" loc=(112,12)
+type=T_OP_ASSIGN            data="=" loc=(112,19)
+type=T_NUMBER               data="10" itype=I_INT          ival=10 loc=(112,21)
+type=T_END_STATEMENT        data=";" loc=(112,23)
+type=T_BRACE_BEGIN          data="{" loc=(113,8)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(114,12)
+type=T_COMMENT_BODY         data=" 这个依据我的习惯(或者说是我以前看过的标准上这么说的，建议预处理指令0缩进)" loc=(114,14)
+type=T_PP_DEFINE            data="#define" loc=(115,19)
+type=T_IDENTIFIER           data="INNER_THRESHOLD" loc=(115,20)
+type=T_NUMBER               data="64" itype=I_INT          ival=64 loc=(115,36)
+type=T_IDENTIFIER           data="int" loc=(116,12)
+type=T_IDENTIFIER           data="level2" loc=(116,16)
+type=T_OP_ASSIGN            data="=" loc=(116,23)
+type=T_NUMBER               data="20" itype=I_INT          ival=20 loc=(116,25)
+type=T_END_STATEMENT        data=";" loc=(116,27)
+type=T_KW_IF                data="if" loc=(117,12)
+type=T_PARENTHESE_BEGIN     data="(" loc=(117,14)
+type=T_IDENTIFIER           data="level2" loc=(117,15)
+type=T_OP_GT                data=">" loc=(117,22)
+type=T_IDENTIFIER           data="INNER_THRESHOLD" loc=(117,24)
+type=T_PARENTHESE_END       data=")" loc=(117,39)
+type=T_BRACE_BEGIN          data="{" loc=(117,40)
+type=T_IDENTIFIER           data="level2" loc=(118,16)
+type=T_OP_ASSIGN            data="=" loc=(118,23)
+type=T_IDENTIFIER           data="INNER_THRESHOLD" loc=(118,25)
+type=T_END_STATEMENT        data=";" loc=(118,40)
+type=T_BRACE_END            data="}" loc=(119,12)
+type=T_BRACE_END            data="}" loc=(120,8)
+type=T_BRACE_END            data="}" loc=(121,4)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(123,4)
+type=T_COMMENT_BODY         data=" goto语句与标签定义" loc=(123,6)
+type=T_KW_GOTO              data="goto" loc=(124,4)
+type=T_IDENTIFIER           data="skip_step" loc=(124,9)
+type=T_END_STATEMENT        data=";" loc=(124,18)
+type=T_IDENTIFIER           data="base" loc=(125,4)
+type=T_OP_ASSIGN            data="=" loc=(125,9)
+type=T_IDENTIFIER           data="base" loc=(125,11)
+type=T_OP_ADD               data="+" loc=(125,16)
+type=T_NUMBER               data="999" itype=I_INT          ival=999 loc=(125,18)
+type=T_END_STATEMENT        data=";" loc=(125,21)
+type=T_IDENTIFIER           data="skip_step" loc=(126,0)
+type=T_OP_COLON             data=":" loc=(126,9)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(128,4)
+type=T_COMMENT_BODY         data=" return语句" loc=(128,6)
+type=T_KW_RETURN            data="return" loc=(129,4)
+type=T_IDENTIFIER           data="base" loc=(129,11)
+type=T_OP_ADD               data="+" loc=(129,16)
+type=T_IDENTIFIER           data="dec_num" loc=(129,18)
+type=T_END_STATEMENT        data=";" loc=(129,25)
+type=T_BRACE_END            data="}" loc=(130,0)
+type=T_COMMENT_SINGLE_LINE  data="//" loc=(132,0)
+type=T_COMMENT_BODY         data=" void返回类型函数定义与空return" loc=(132,2)
+type=T_IDENTIFIER           data="void" loc=(133,0)
+type=T_IDENTIFIER           data="log_message" loc=(133,5)
+type=T_PARENTHESE_BEGIN     data="(" loc=(133,16)
+type=T_IDENTIFIER           data="int" loc=(133,17)
+type=T_IDENTIFIER           data="code" loc=(133,21)
+type=T_COMMA                data="," loc=(133,25)
+type=T_IDENTIFIER           data="float" loc=(133,27)
+type=T_IDENTIFIER           data="val" loc=(133,33)
+type=T_PARENTHESE_END       data=")" loc=(133,36)
+type=T_BRACE_BEGIN          data="{" loc=(133,37)
+type=T_IDENTIFIER           data="printf" loc=(134,4)
+type=T_PARENTHESE_BEGIN     data="(" loc=(134,10)
+type=T_STRING_LITERAL       data=""Code: %d, Value: %f\n"" loc=(134,34)
+type=T_COMMA                data="," loc=(134,34)
+type=T_IDENTIFIER           data="code" loc=(134,36)
+type=T_COMMA                data="," loc=(134,40)
+type=T_IDENTIFIER           data="val" loc=(134,42)
+type=T_PARENTHESE_END       data=")" loc=(134,45)
+type=T_END_STATEMENT        data=";" loc=(134,46)
+type=T_KW_RETURN            data="return" loc=(135,4)
+type=T_END_STATEMENT        data=";" loc=(135,10)
+type=T_BRACE_END            data="}" loc=(136,0)
+
+AST Structure:
+[PROGRAM]
+  [COMMENT] /**
+ * @file demo.c
+ * @author aaaa0ggmc (lovelinux@yslwd.eu.org)
+ * @brief 简单演示文件
+ * @version 5.0
+ * @date 2026-09-07
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
+  [COMMENT] /// 预处理指令 ，保持0缩进
+  [PREPROCESS] #include <stdio.h>
+  [PREPROCESS] #define MAX_BUFFER 1024
+  [PREPROCESS] #define PI 3.14159f
+  [PREPROCESS] #define ENABLE_FEATURE 1
+  [PREPROCESS] #undef OBSOLETE_FLAG
+  [COMMENT] /// 全局变量声明与多变量合并
+  [COMMENT] /// int, float, double, char, void, long
+  [VAR_DECL] type: int name: g_counter
+    init:
+      [NUM] 0
+  VAR_DECL (multi) type: int name: g_status
+    init:
+      [NUM] 1
+  [VAR_DECL] type: int name: g_buffer [array]
+    dims:
+      [NUM] 64
+  [VAR_DECL] type: float name: g_ratio
+    init:
+      [NUM] 1.0f
+  VAR_DECL (multi) type: float name: g_scale
+    init:
+      [NUM] 0.1e2
+  [VAR_DECL] type: double name: g_epsilon
+    init:
+      [NUM] 1.5e-4
+  [VAR_DECL] type: char name: g_tag
+    init:
+      [CHAR] "'V'"
+  [VAR_DECL] type: long name: g_large
+    init:
+      [NUM] 100000
+  [COMMENT] /// 函数声明
+  [FUNC_DECL] DECL int (name: calculate_sum)
+    params:
+      [VAR_DECL] type: int name: a
+      [VAR_DECL] type: int name: b
+  [FUNC_DECL] DECL int (name: sum_array)
+    params:
+      [VAR_DECL] type: int name: arr [array]
+        dims:
+          [NULL_EXPR]
+      [VAR_DECL] type: int name: size
+  [FUNC_DECL] DECL void (name: log_message)
+    params:
+      [VAR_DECL] type: int name: code
+      [VAR_DECL] type: float name: val
+  [COMMENT] /// 函数定义
+  [FUNC_DEF] DEF int (name: process_algorithm)
+    params:
+      [VAR_DECL] type: int name: base
+      [VAR_DECL] type: float name: factor
+    body:
+      [COMPOUND_STMT]
+        [VAR_DECL] type: int name: dec_num
+          init:
+            [NUM] 42
+        [COMMENT] // 十进制整数
+        [VAR_DECL] type: int name: hex_num
+          init:
+            [NUM] 42
+        [COMMENT] // 十六进制整数
+        [VAR_DECL] type: int name: oct_num
+          init:
+            [NUM] 42
+        [COMMENT] // 八进制整数
+        [VAR_DECL] type: int name: bin_num
+          init:
+            [NUM] 42
+        [COMMENT] // 二进制整数
+        [VAR_DECL] type: float name: float_val
+          init:
+            [NUM] 3.14f
+        [COMMENT] // 浮点数带单精度后缀
+        [VAR_DECL] type: double name: sci_val
+          init:
+            [NUM] 0.25e3
+        [COMMENT] // 科学计数法浮点数
+        [VAR_DECL] type: char name: ch
+          init:
+            [CHAR] "'A'"
+        [COMMENT] // 字符常量
+        [VAR_DECL] type: char name: newline
+          init:
+            [CHAR] "'\n'"
+        [COMMENT] // 转义字符常量
+        [COMMENT] /// 表达式与运算符优先级层级
+        [COMMENT] // 算术运算: +, -, *, /, %
+        [VAR_DECL] type: int name: math_res
+          init:
+            [/]
+              [PAREN]
+                [+]
+                  [VAR] dec_num
+                  [*]
+                    [VAR] hex_num
+                    [NUM] 2
+              [PAREN]
+                [%]
+                  [VAR] oct_num
+                  [NUM] 10
+        [COMMENT] // 位运算: &, ^, |, ~
+        [VAR_DECL] type: int name: bit_res
+          init:
+            [|]
+              [PAREN]
+                [&]
+                  [VAR] dec_num
+                  [NUM] 255
+              [PAREN]
+                [^]
+                  [~]
+                    [VAR] bin_num
+                  [NUM] 1
+        [COMMENT] // 关系与判等运算: <, <=, >, >=, ==, !=
+        [COMMENT] // 逻辑运算: &&, ||, !
+        [VAR_DECL] type: int name: logic_res
+          init:
+            [&&]
+              [&&]
+                [!]
+                  [PAREN]
+                    [<]
+                      [VAR] base
+                      [NUM] 0
+                [PAREN]
+                  [||]
+                    [>=]
+                      [VAR] factor
+                      [NUM] 1.0f
+                    [==]
+                      [VAR] base
+                      [NUM] 42
+              [PAREN]
+                [!=]
+                  [VAR] hex_num
+                  [VAR] oct_num
+        [COMMENT] // 前置与后置自增自减: ++, --
+        [EXPR_STMT]
+          [PRE_++]
+            [VAR] base
+        [EXPR_STMT]
+          [POST_++]
+            [VAR] base
+        [EXPR_STMT]
+          [PRE_--]
+            [VAR] dec_num
+        [EXPR_STMT]
+          [POST_--]
+            [VAR] dec_num
+        [COMMENT] // 数组声明、下标运算与函数调用
+        [VAR_DECL] type: int name: arr_data [array]
+          dims:
+            [NUM] 5
+          init:
+            [INIT_LIST]
+              [NUM] 10
+              [NUM] 20
+              [NUM] 30
+              [NUM] 40
+              [NUM] 50
+        [VAR_DECL] type: int name: item
+          init:
+            [INDEX]
+              [VAR] arr_data
+              [NUM] 0
+        [VAR_DECL] type: int name: call_res
+          init:
+            [FUNCALL] calculate_sum()
+              args:
+                [VAR] base
+                [VAR] math_res
+        [COMMENT] // 条件语句
+        [IF]
+          cond:
+            [>]
+              [VAR] base
+              [NUM] 100
+          then:
+            [COMPOUND_STMT]
+              [EXPR_STMT]
+                [=]
+                  [VAR] base
+                  [-]
+                    [VAR] base
+                    [NUM] 10
+          else:
+            [IF]
+              cond:
+                [==]
+                  [VAR] base
+                  [NUM] 100
+              then:
+                [COMPOUND_STMT]
+                  [EXPR_STMT]
+                    [=]
+                      [VAR] base
+                      [NUM] 0
+              else:
+                [COMPOUND_STMT]
+                  [EXPR_STMT]
+                    [=]
+                      [VAR] base
+                      [+]
+                        [VAR] base
+                        [NUM] 10
+        [COMMENT] // while循环与break
+        [WHILE]
+          cond:
+            [>]
+              [VAR] math_res
+              [NUM] 0
+          body:
+            [COMPOUND_STMT]
+              [EXPR_STMT]
+                [POST_--]
+                  [VAR] math_res
+              [IF]
+                cond:
+                  [==]
+                    [VAR] math_res
+                    [NUM] 5
+                then:
+                  [COMPOUND_STMT]
+                    [BREAK]
+        [COMMENT] // do-while循环与continue
+        [DO_WHILE]
+          cond:
+            [<]
+              [VAR] base
+              [NUM] 20
+          body:
+            [COMPOUND_STMT]
+              [EXPR_STMT]
+                [=]
+                  [VAR] base
+                  [+]
+                    [VAR] base
+                    [NUM] 1
+              [IF]
+                cond:
+                  [==]
+                    [%]
+                      [VAR] base
+                      [NUM] 2
+                    [NUM] 0
+                then:
+                  [COMPOUND_STMT]
+                    [CONTINUE]
+        [COMMENT] // for循环
+        [FOR]
+          init:
+            [VAR_DECL] type: int name: idx
+              init:
+                [NUM] 0
+          cond:
+            [<]
+              [VAR] idx
+              [NUM] 10
+          inc:
+            [PRE_++]
+              [VAR] idx
+          body:
+            [COMPOUND_STMT]
+              [EXPR_STMT]
+                [=]
+                  [VAR] dec_num
+                  [+]
+                    [VAR] dec_num
+                    [VAR] idx
+        [COMMENT] // switch控制流
+        [SWITCH]
+          cond:
+            [VAR] dec_num
+          body:
+            [COMPOUND_STMT]
+              [CASE]
+                val:
+                  [NUM] 1
+                [EXPR_STMT]
+                  [=]
+                    [VAR] base
+                    [+]
+                      [VAR] base
+                      [NUM] 1
+              [BREAK]
+              [CASE]
+                val:
+                  [NUM] 2
+                [COMPOUND_STMT]
+                  [EXPR_STMT]
+                    [=]
+                      [VAR] base
+                      [+]
+                        [VAR] base
+                        [NUM] 2
+                  [BREAK]
+              [DEFAULT]
+                [COMPOUND_STMT]
+                  [EXPR_STMT]
+                    [=]
+                      [VAR] base
+                      [NUM] 0
+                  [BREAK]
+        [COMMENT] // 多层嵌套代码块与局部预处理指令
+        [COMPOUND_STMT]
+          [VAR_DECL] type: int name: level1
+            init:
+              [NUM] 10
+          [COMPOUND_STMT]
+            [COMMENT] // 这个依据我的习惯(或者说是我以前看过的标准上这么说的，建议预处理指令0缩进)
+            [PREPROCESS] #define INNER_THRESHOLD 64
+            [VAR_DECL] type: int name: level2
+              init:
+                [NUM] 20
+            [IF]
+              cond:
+                [>]
+                  [VAR] level2
+                  [VAR] INNER_THRESHOLD
+              then:
+                [COMPOUND_STMT]
+                  [EXPR_STMT]
+                    [=]
+                      [VAR] level2
+                      [VAR] INNER_THRESHOLD
+        [COMMENT] // goto语句与标签定义
+        [GOTO]
+        [EXPR_STMT]
+          [=]
+            [VAR] base
+            [+]
+              [VAR] base
+              [NUM] 999
+        [LABEL] skip_step:
+        [COMMENT] // return语句
+        [RETURN]
+          [+]
+            [VAR] base
+            [VAR] dec_num
+  [COMMENT] // void返回类型函数定义与空return
+  [FUNC_DEF] DEF void (name: log_message)
+    params:
+      [VAR_DECL] type: int name: code
+      [VAR_DECL] type: float name: val
+    body:
+      [COMPOUND_STMT]
+        [EXPR_STMT]
+          [FUNCALL] printf()
+            args:
+              [STRING] ""Code: %d, Value: %f\n""
+              [VAR] code
+              [VAR] val
+        [RETURN]
+
+Formatted code written to "/tmp/output_test.c"

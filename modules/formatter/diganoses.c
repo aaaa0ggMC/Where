@@ -27,7 +27,7 @@ int sd_printf(stage_diagnoses * diagnoses, char * fmt,...){
     va_end(ap2);
 
     info->message = malloc(length + 1);
-    vsnprintf(info->message, length, fmt, ap);
+    vsnprintf(info->message, length + 1, fmt, ap);
     va_end(ap);
 
     return length;

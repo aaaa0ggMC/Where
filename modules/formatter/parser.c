@@ -105,6 +105,20 @@ static Node * parse_comment(parser_context * ctx){
     return node;
 }
 
+/// 提取当前连续的行内注释链表
+static Node * take_inline_comments(parser_context * ctx){
+    Node head = {};
+    Node * cur = &head;
+    while(check_comment(ctx)){
+        Node * c = parse_comment(ctx);
+        if(c){
+            cur->next = c;
+            cur = c;
+        }
+    }
+    return head.next;
+}
+
 /// 检查当前 Token 类型是否匹配
 static inline int check(parser_context * ctx, enum TokenType type){
     Token * tok = parser_peek(ctx);
@@ -228,46 +242,44 @@ static Node * parse_preprocessor(parser_context * ctx);
 
 /// primary = "(" expr ")" | NUM | STRING | CHAR | IDENT
 static Node * primary(parser_context * ctx){
+    Node * comm = take_inline_comments(ctx);
     skip_inline_comments(ctx);
     Token * tok = parser_peek(ctx);
     if(!tok) return NULL;
+    Node * res = NULL;
 
     if(consume(ctx, T_PARENTHESE_BEGIN)){
         Node * node = expr(ctx);
         skip(ctx, T_PARENTHESE_END);
-        return node;
-    }
-
-    if(is_number_token(tok->type)){
+        res = new_unary(ND_PAREN, node, tok);
+    }else if(is_number_token(tok->type)){
         ctx->index++;
         if(tok->type == T_NUMBER_FLOAT){
-            return new_float(tok->ival.ld, tok);
+            res = new_float(tok->ival.ld, tok);
+        }else{
+            res = new_num(tok->ival.ull, tok);
         }
-        return new_num(tok->ival.ull, tok);
+    }else if(consume(ctx, T_STRING_LITERAL)){
+        res = new_node(ND_STRING, tok);
+        res->str_val = tok->data;
+    }else if(consume(ctx, T_CHAR_LITERAL)){
+        res = new_node(ND_CHAR, tok);
+        res->str_val = tok->data;
+    }else if(consume(ctx, T_IDENTIFIER)){
+        res = new_var(tok);
+    }else{
+        sd_printf(ctx->diagnoses, "Unexpected token \"%.*s\" at row %d col %d in expression",
+            sv_length(tok->data), sv_begin(tok->data),
+            tok->location.row, tok->location.col);
+        ctx->success = 0;
+        ctx->index++;
+        return NULL;
     }
 
-    if(consume(ctx, T_STRING_LITERAL)){
-        Node * node = new_node(ND_STRING, tok);
-        node->str_val = tok->data;
-        return node;
+    if(res && comm){
+        res->leading_comment = comm;
     }
-
-    if(consume(ctx, T_CHAR_LITERAL)){
-        Node * node = new_node(ND_CHAR, tok);
-        node->str_val = tok->data;
-        return node;
-    }
-
-    if(consume(ctx, T_IDENTIFIER)){
-        return new_var(tok);
-    }
-
-    sd_printf(ctx->diagnoses, "Unexpected token \"%.*s\" at row %d col %d in expression",
-        sv_length(tok->data), sv_begin(tok->data),
-        tok->location.row, tok->location.col);
-    ctx->success = 0;
-    ctx->index++;
-    return NULL;
+    return res;
 }
 
 /// postfix = primary ("(" func-args? ")" | "[" expr "]" | "++" | "--")*
@@ -280,8 +292,10 @@ static Node * postfix(parser_context * ctx){
 
         if(consume(ctx, T_PARENTHESE_BEGIN)){
             Node * call = new_node(ND_FUNCALL, tok);
-            if(node && node->kind == ND_VAR){
-                call->name = node->name;
+            Node * target = node;
+            while(target && target->kind == ND_PAREN) target = target->lhs;
+            if(target && target->kind == ND_VAR){
+                call->name = target->name;
             }
 
             Node arg_head = {};
@@ -525,13 +539,47 @@ static Node * expr_stmt(parser_context * ctx){
     return node;
 }
 
-/// declaration = typename ident ("=" expr)? ("," ident ("=" expr)?)* ";"
+/// array_initializer = "{" (expr | array_initializer)* "}"
+static Node * parse_init_list(parser_context * ctx){
+    Token * tok = parser_peek(ctx);
+    skip(ctx, T_BRACE_BEGIN);
+    Node * list = new_node(ND_INIT_LIST, tok);
+    Node head = {};
+    Node * cur = &head;
+
+    while(!check(ctx, T_BRACE_END) && parser_peek(ctx)){
+        skip_inline_comments(ctx);
+        if(check(ctx, T_BRACE_END)) break;
+
+        Node * elem = NULL;
+        if(check(ctx, T_BRACE_BEGIN)){
+            elem = parse_init_list(ctx);
+        }else{
+            elem = assign(ctx);
+        }
+
+        if(elem){
+            cur->next = elem;
+            cur = elem;
+        }
+
+        if(!consume(ctx, T_COMMA)){
+            break;
+        }
+    }
+    skip(ctx, T_BRACE_END);
+    list->body = head.next;
+    return list;
+}
+
+/// declaration = typename ident ("[" expr? "]")* ("=" (expr | init_list))? ("," ident ("[" expr? "]")* ("=" (expr | init_list))?)* ";"
 static Node * declaration(parser_context * ctx){
     Token * ty_tok = parser_fetch(ctx);
     Node * first_var = NULL;
     Node * last_sub = NULL;
 
     while(1){
+        Node * comm = take_inline_comments(ctx);
         skip_inline_comments(ctx);
         Token * var_tok = parser_peek(ctx);
         if(!check(ctx, T_IDENTIFIER)){
@@ -546,9 +594,34 @@ static Node * declaration(parser_context * ctx){
         var->type_name = ty_tok->data;
         var->builtin_type = check_builtin_type(ty_tok->data);
         var->name = var_tok->data;
+        var->leading_comment = comm;
+
+        while(consume(ctx, T_BRACKET_BEGIN)){
+            var->is_array = 1;
+            Node * dim = NULL;
+            if(!check(ctx, T_BRACKET_END)){
+                dim = expr(ctx);
+            }else{
+                dim = new_node(ND_NULL_EXPR, parser_peek(ctx));
+            }
+            skip(ctx, T_BRACKET_END);
+
+            if(!var->array_dim){
+                var->array_dim = dim;
+            }else{
+                Node * d = var->array_dim;
+                while(d->next) d = d->next;
+                d->next = dim;
+            }
+        }
 
         if(consume(ctx, T_OP_ASSIGN)){
-            var->lhs = assign(ctx);
+            skip_inline_comments(ctx);
+            if(check(ctx, T_BRACE_BEGIN)){
+                var->lhs = parse_init_list(ctx);
+            }else{
+                var->lhs = assign(ctx);
+            }
         }
 
         if(!first_var){
@@ -840,6 +913,7 @@ static Node * parse_function(parser_context * ctx){
         if(check_typename(ctx)){
             Token * p_ty = parser_fetch(ctx);
             Token * p_name = NULL;
+            Node * p_comm = take_inline_comments(ctx);
             skip_inline_comments(ctx);
             if(check(ctx, T_IDENTIFIER)){
                 p_name = parser_fetch(ctx);
@@ -847,9 +921,30 @@ static Node * parse_function(parser_context * ctx){
             Node * p_node = new_node(ND_VAR_DECL, p_name ? p_name : p_ty);
             p_node->type_name = p_ty->data;
             p_node->builtin_type = check_builtin_type(p_ty->data);
+            p_node->leading_comment = p_comm;
             if(p_name){
                 p_node->name = p_name->data;
             }
+
+            while(consume(ctx, T_BRACKET_BEGIN)){
+                p_node->is_array = 1;
+                Node * dim = NULL;
+                if(!check(ctx, T_BRACKET_END)){
+                    dim = expr(ctx);
+                }else{
+                    dim = new_node(ND_NULL_EXPR, parser_peek(ctx));
+                }
+                skip(ctx, T_BRACKET_END);
+
+                if(!p_node->array_dim){
+                    p_node->array_dim = dim;
+                }else{
+                    Node * d = p_node->array_dim;
+                    while(d->next) d = d->next;
+                    d->next = dim;
+                }
+            }
+
             param_cur->next = p_node;
             param_cur = p_node;
         }else{

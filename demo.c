@@ -11,7 +11,6 @@
 
 /// 预处理指令 ，保持0缩进
 #include <stdio.h>
-#include "custom_header.h"
 #define MAX_BUFFER 1024
 #define PI 3.14159f
 #define ENABLE_FEATURE 1
@@ -20,6 +19,7 @@
 /// 全局变量声明与多变量合并
 /// int, float, double, char, void, long
 int g_counter = 0, g_status = 1;
+int g_buffer[64];
 float g_ratio = 1.0f, g_scale = 0.1e2;
 double g_epsilon = 1.5e-4;
 char g_tag = 'V';
@@ -27,6 +27,7 @@ long g_large = 100000;
 
 /// 函数声明
 int calculate_sum(int a, int b);
+int sum_array(int arr[], int size);
 void log_message(int code, float val);
 
 /// 函数定义
@@ -57,8 +58,9 @@ int process_algorithm(int base, float factor){
     --dec_num;
     dec_num--;
 
-    // 数组下标运算与函数调用
-    int item = base[0];
+    // 数组声明、下标运算与函数调用
+    int arr_data[5] = {10, 20, 30, 40, 50};
+    int item = arr_data[0];
     int call_res = calculate_sum(base, math_res);
 
     // 条件语句

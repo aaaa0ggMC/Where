@@ -79,7 +79,9 @@ typedef enum {
     ND_FUNC_DECL,     // 函数声明 (返回值类型, 函数名, 参数)
     ND_PREPROCESS,    // 预处理指令节点 (#include, #define 等)
     ND_COMMENT,       // 注释节点 (单行或多行注释)
-    ND_PROGRAM        // 顶层程序节点 (连接外部定义序列)
+    ND_PROGRAM,       // 顶层程序节点 (连接外部定义序列)
+    ND_PAREN,         // ( expr ) 括号表达式
+    ND_INIT_LIST      // { e1, e2, ... } 初始化列表
 } NodeKind;
 
 typedef struct Node Node;
@@ -106,6 +108,13 @@ struct Node {
     string_view name; // 标识符名称
     BuiltinType builtin_type; // AST识别出的内建类型
     string_view type_name; // 原始类型字符串
+
+    // 数组维度 (ND_VAR_DECL)
+    int is_array;
+    Node * array_dim; // 链表组织的多维维度表达式 (array_dim->next 为下一维)
+
+    // 行内/前置注释
+    Node * leading_comment; // 关联的行内或前置注释链表
 
     // 函数实参或形参列表
     Node * args;
