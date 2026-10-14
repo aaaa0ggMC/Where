@@ -1,0 +1,82 @@
+name: Windows build
+
+# 产出可直接运行、无第三方 DLL 依赖的 Windows 可执行文件（100% 静态链接）。
+# 触发：推送到 main、Pull Request、或在 Actions 页面手动 Run workflow。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    name: Windows x64 (MinGW-w64 MINGW64/msvcrt, static)
+    runs-on: windows-latest
+    defaults:
+      run:
+        # 用 MSYS2 的 bash，便于使用 * 通配符与 grep
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 / MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          # MINGW64 环境链接 Windows 自带的 msvcrt.dll，兼容面最广
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc
+
+      - name: Build (fully static)
+        run: |
+          set -eux
+          mkdir -p dist
+
+          # quick_log：静态库
+          gcc -std=c11 -O2 -Iinclude -c modules/quick_log/quick_log.c -o quick_log.o
+          ar rcs dist/libquick_log.a quick_log.o
+
+          # formatter：本次课程设计的主体程序
+          gcc -std=c11 -O2 -Iinclude -static -static-libgcc \
+              modules/formatter/*.c -o dist/formatter.exe
+
+          # hello_world：依赖 quick_log
+          gcc -std=c11 -O2 -Iinclude -static -static-libgcc \
+              modules/hello_world/main.c dist/libquick_log.a -o dist/hello_world.exe
+
+          # 静态链接后只应依赖 Windows 自带组件，便于确认“可独立运行”
+          objdump -p dist/formatter.exe | grep 'DLL Name' || true
+          ls -l dist
+
+      - name: Smoke test
+        run: |
+          set -eux
+          ./dist/formatter.exe --help > help.txt
+          grep -q 'formatter \[options\]' help.txt
+
+          ./dist/formatter.exe demo.c --format dist/demo.formatted.c > format.log
+          test -s dist/demo.formatted.c
+          grep -q 'AST Structure:' format.log
+
+          # input_test.c 含非法语法，应给出诊断而不是崩溃
+          ./dist/formatter.exe input_test.c > diag.log || true
+          grep -q 'Expected variable name' diag.log
+
+          ./dist/hello_world.exe > hello.txt
+          grep -q 'Hello World' hello.txt
+
+          echo "formatted lines: $(wc -l < dist/demo.formatted.c)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatter-windows-x64
+          path: |
+            dist/formatter.exe
+            dist/hello_world.exe
+            dist/libquick_log.a
+          if-no-files-found: error

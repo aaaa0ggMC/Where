@@ -107,7 +107,7 @@ static Node * parse_comment(parser_context * ctx){
 
 /// 提取当前连续的行内注释链表
 static Node * take_inline_comments(parser_context * ctx){
-    Node head = {};
+    Node head = {0};
     Node * cur = &head;
     while(check_comment(ctx)){
         Node * c = parse_comment(ctx);
@@ -298,7 +298,7 @@ static Node * postfix(parser_context * ctx){
                 call->name = target->name;
             }
 
-            Node arg_head = {};
+            Node arg_head = {0};
             Node * arg_cur = &arg_head;
 
             while(!check(ctx, T_PARENTHESE_END) && parser_peek(ctx)){
@@ -544,7 +544,7 @@ static Node * parse_init_list(parser_context * ctx){
     Token * tok = parser_peek(ctx);
     skip(ctx, T_BRACE_BEGIN);
     Node * list = new_node(ND_INIT_LIST, tok);
-    Node head = {};
+    Node head = {0};
     Node * cur = &head;
 
     while(!check(ctx, T_BRACE_END) && parser_peek(ctx)){
@@ -650,7 +650,7 @@ static Node * compound_stmt(parser_context * ctx){
     Node * block = new_node(ND_COMPOUND_STMT, start);
     skip(ctx, T_BRACE_BEGIN);
 
-    Node head = {};
+    Node head = {0};
     Node * cur = &head;
 
     while(!check(ctx, T_BRACE_END) && parser_peek(ctx)){
@@ -904,7 +904,7 @@ static Node * parse_function(parser_context * ctx){
     Token * name_tok = parser_fetch(ctx);
     skip(ctx, T_PARENTHESE_BEGIN);
 
-    Node param_head = {};
+    Node param_head = {0};
     Node * param_cur = &param_head;
 
     while(!check(ctx, T_PARENTHESE_END) && parser_peek(ctx)){
@@ -1004,7 +1004,7 @@ parser_result parse_ast(vector * tokens){
 
     Token * first_tok = parser_peek(ctx);
     Node * prog = new_node(ND_PROGRAM, first_tok);
-    Node head = {};
+    Node head = {0};
     Node * cur = &head;
 
     while(parser_peek(ctx)){

@@ -1,5 +1,6 @@
 #include <formatter/tokenizer.h>
 #include <formatter/map.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 typedef struct {

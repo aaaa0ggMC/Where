@@ -488,12 +488,24 @@ void format_ast(Node * root, FILE * out){
 }
 
 char * format_ast_to_string(Node * root){
-    char * buffer = NULL;
-    size_t size = 0;
-    FILE * mem = open_memstream(&buffer, &size);
+    // tmpfile() 属于 ISO C，Windows(MSVC/MinGW) 与 POSIX 都提供；
+    // 原先的 open_memstream() 是 POSIX.1-2008，Windows 运行库没有该函数。
+    FILE * mem = tmpfile();
     if(!mem) return NULL;
 
     format_ast(root, mem);
+
+    if(fflush(mem) != 0){ fclose(mem); return NULL; }
+    long size = ftell(mem);
+    if(size < 0){ fclose(mem); return NULL; }
+
+    char * buffer = (char *)malloc((size_t)size + 1);
+    if(!buffer){ fclose(mem); return NULL; }
+
+    rewind(mem);
+    size_t read_size = fread(buffer, 1, (size_t)size, mem);
     fclose(mem);
+
+    buffer[read_size] = '\0';
     return buffer;
 }

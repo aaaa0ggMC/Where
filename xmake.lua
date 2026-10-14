@@ -1,3 +1,6 @@
+set_project("Where")
+set_languages("c11")
+
 add_rules("mode.debug","mode.release")
 add_rules("plugin.compile_commands.autoupdate", {outputDir = "."})
 
