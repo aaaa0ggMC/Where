@@ -15,9 +15,11 @@ jobs:
   windows-x64:
     name: Windows x64 (MinGW-w64 MINGW64/msvcrt, static)
     runs-on: windows-latest
+    # 防止某个步骤卡死时一直占用 runner
+    timeout-minutes: 15
     defaults:
       run:
-        # 用 MSYS2 的 bash，便于使用 * 通配符与 grep
+        # 构建用 MSYS2 的 bash，便于使用 * 通配符
         shell: msys2 {0}
     steps:
       - name: Checkout
@@ -36,40 +38,63 @@ jobs:
           set -eux
           mkdir -p dist
 
-          # quick_log：静态库
           gcc -std=c11 -O2 -Iinclude -c modules/quick_log/quick_log.c -o quick_log.o
           ar rcs dist/libquick_log.a quick_log.o
 
-          # formatter：本次课程设计的主体程序
           gcc -std=c11 -O2 -Iinclude -static -static-libgcc \
               modules/formatter/*.c -o dist/formatter.exe
 
-          # hello_world：依赖 quick_log
           gcc -std=c11 -O2 -Iinclude -static -static-libgcc \
               modules/hello_world/main.c dist/libquick_log.a -o dist/hello_world.exe
 
-          # 静态链接后只应依赖 Windows 自带组件，便于确认“可独立运行”
-          objdump -p dist/formatter.exe | grep 'DLL Name' || true
+          objdump -p dist/formatter.exe | grep 'DLL Name' | tee dist/dll-deps.txt
+          if grep -qiE 'libgcc|libstdc|libwinpthread|libssp' dist/dll-deps.txt; then
+            echo "::error::存在非系统 DLL 依赖，无法独立运行"
+            exit 1
+          fi
           ls -l dist
 
+      # 用 PowerShell 逐个跑，并给每次调用加超时、打印退出码：
+      # 卡死或崩溃都能在一次运行里看出来。
       - name: Smoke test
+        shell: pwsh
         run: |
-          set -eux
-          ./dist/formatter.exe --help > help.txt
-          grep -q 'formatter \[options\]' help.txt
+          $ErrorActionPreference = 'Stop'
 
-          ./dist/formatter.exe demo.c --format dist/demo.formatted.c > format.log
-          test -s dist/demo.formatted.c
-          grep -q 'AST Structure:' format.log
+          [IO.File]::WriteAllText("$PWD/smoke.c", "int main(void)`n{`n    int a = 1 + 2;`n    return a;`n}`n")
 
-          # input_test.c 含非法语法，应给出诊断而不是崩溃
-          ./dist/formatter.exe input_test.c > diag.log || true
-          grep -q 'Expected variable name' diag.log
+          function Invoke-Tool {
+            param([string]$Exe, [string[]]$Arguments, [string]$OutFile, [int]$TimeoutMs = 60000)
+            $tmp = Join-Path $env:TEMP ("out-" + [IO.Path]::GetRandomFileName())
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $p = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -PassThru -RedirectStandardOutput $tmp
+            if (-not $p.WaitForExit($TimeoutMs)) {
+              $p.Kill()
+              throw "TIMEOUT after ${TimeoutMs}ms: $Exe $($Arguments -join ' ')"
+            }
+            $sw.Stop()
+            $size = if (Test-Path $tmp) { (Get-Item $tmp).Length } else { 0 }
+            Write-Host ("exit=0x{0:X8} ({1}ms, {2} bytes out): {3} {4}" -f $p.ExitCode, $sw.ElapsedMilliseconds, $size, $Exe, ($Arguments -join ' '))
+            if (Test-Path $tmp) { Move-Item -Force $tmp $OutFile }
+            else { Set-Content -Path $OutFile -Value '' }
+          }
 
-          ./dist/hello_world.exe > hello.txt
-          grep -q 'Hello World' hello.txt
+          Invoke-Tool dist/formatter.exe @('--help') help.txt
+          Invoke-Tool dist/formatter.exe @('smoke.c', '--format', 'dist/smoke.formatted.c') smoke.log
+          Invoke-Tool dist/formatter.exe @('demo.c', '--format', 'dist/demo.formatted.c') format.log
+          Invoke-Tool dist/formatter.exe @('input_test.c') diag.log
+          Invoke-Tool dist/hello_world.exe @() hello.txt
 
-          echo "formatted lines: $(wc -l < dist/demo.formatted.c)"
+          Select-String -Path help.txt   -Pattern 'formatter \[options\]' -Quiet | Out-Null
+
+          if ((Get-Item dist/smoke.formatted.c).Length -le 0) { throw 'smoke.c 格式化输出为空' }
+          if ((Get-Item dist/demo.formatted.c).Length  -le 0) { throw 'demo.c 格式化输出为空' }
+          if (-not (Select-String -Path format.log -Pattern 'AST Structure:' -Quiet)) { throw '缺少 AST 输出' }
+          if (-not (Select-String -Path diag.log   -Pattern 'Expected variable name' -Quiet)) { throw '缺少错误诊断' }
+          if (-not (Select-String -Path hello.txt  -Pattern 'Hello World' -Quiet)) { throw 'hello_world 异常' }
+
+          Write-Host "smoke lines: $((Get-Content dist/smoke.formatted.c).Count)"
+          Write-Host "demo  lines: $((Get-Content dist/demo.formatted.c).Count)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
