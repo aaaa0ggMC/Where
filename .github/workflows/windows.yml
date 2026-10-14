@@ -54,6 +54,18 @@ jobs:
           fi
           ls -l dist
 
+      # 先上传产物：即使后面的烟测失败，也不影响把 exe 传上去
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatter-windows-x64
+          path: |
+            dist/formatter.exe
+            dist/hello_world.exe
+            dist/libquick_log.a
+          if-no-files-found: error
+
       # 用 PowerShell 逐个跑，并给每次调用加超时、打印退出码：
       # 卡死或崩溃都能在一次运行里看出来。
       - name: Smoke test
