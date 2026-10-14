@@ -88,7 +88,11 @@ tokenizer_result parse_tokens(string_view sv, vector * vec){
         // printf("parsing... %d/%d\n",context.index,sv_length(sv));
         // 跳过空格
         char peek = context_peek(context);
-        
+
+        // '\0' 说明已越过有效内容（例如输入里含 NUL 字节）。
+        // context_fetch() 在 EOF 上按设计不前进，必须在这里主动跳出，否则死循环。
+        if(ch_eof(peek)) break;
+
         // 初始化恢复的context
         recovery.recovering = false;
         recovery.end = context->index;

@@ -107,13 +107,3 @@ jobs:
 
           Write-Host "smoke lines: $((Get-Content dist/smoke.formatted.c).Count)"
           Write-Host "demo  lines: $((Get-Content dist/demo.formatted.c).Count)"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: formatter-windows-x64
-          path: |
-            dist/formatter.exe
-            dist/hello_world.exe
-            dist/libquick_log.a
-          if-no-files-found: error

@@ -125,10 +125,11 @@ int main(int argc, const char * argv[]){
         memset(file_buffer,0,sizeof(char) * (buffer_size+1));
 
         fseek(input_file,0,SEEK_SET);
-        
-        fread(file_buffer,sizeof(char),buffer_size,input_file);
-        // 不算后面的0
-        input_sv = sv_build(file_buffer, 0 , buffer_size);
+
+        // Windows 文本模式会把 CRLF 折成 LF，实际字符数会少于 ftell 的字节数；
+        // 必须用 fread 的返回值，否则 string_view 会超长并把缓冲区尾部的 0 当源码。
+        size_t read_size = fread(file_buffer,sizeof(char),buffer_size,input_file);
+        input_sv = sv_build(file_buffer, 0 , (int)read_size);
     
         LOG("Read input:\n```c\n%s\n```\n", file_buffer);
     }
